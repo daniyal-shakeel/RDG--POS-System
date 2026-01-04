@@ -128,6 +128,8 @@ export const getCustomerById = async (req: Request, res: Response) => {
             return res.status(404).json({ message: 'Customer not found' });
         }
         return res.status(200).json({ message: 'Customer fetched successfully', customer });
+
+        // Invoice model -> invoice_id -> customer_id -> customer
     } catch (error) {
         return res.status(500).json({ message: 'Error fetching customer', error });
     }

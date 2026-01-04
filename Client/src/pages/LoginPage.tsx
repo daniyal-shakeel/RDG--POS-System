@@ -47,7 +47,7 @@ export default function LoginPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <h1 className="font-display text-3xl font-bold text-gradient mb-2">
-            Royal Dates Galore
+            XYZ Company Ltd.
           </h1>
           <p className="text-muted-foreground">Point of Sale System</p>
         </div>
@@ -127,7 +127,7 @@ export default function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs text-muted-foreground mt-6">
-          © 2025 The Royal Dates Galore Ltd. All rights reserved.
+          © 2025 The XYZ Company Ltd. Ltd. All rights reserved.
         </p>
       </div>
     </div>
