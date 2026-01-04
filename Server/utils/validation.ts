@@ -389,3 +389,202 @@ export const estimateSchema = z.object({
     path: ['discount_value'],
 });
 
+/**
+ * Pricing inventory validation schema
+ */
+const pricingInventorySchema = z.object({
+    selling_price: requiredNumber(0, undefined, 'Selling price must be 0 or greater'),
+    cost_price: requiredNumber(0, undefined, 'Cost price must be 0 or greater'),
+    current_stock: requiredNumber(0, undefined, 'Current stock must be 0 or greater'),
+    minimum_stock_alert: requiredNumber(0, undefined, 'Minimum stock alert must be 0 or greater'),
+});
+
+/**
+ * Price summary validation schema (optional, will be auto-calculated)
+ */
+const priceSummarySchema = z.object({
+    selling_price: requiredNumber(0, undefined, 'Selling price must be 0 or greater'),
+    cost_price: requiredNumber(0, undefined, 'Cost price must be 0 or greater'),
+    profit_margin: requiredNumber(undefined, undefined, 'Profit margin is required'),
+});
+
+/**
+ * Product validation schema
+ */
+export const productSchema = z.object({
+    product_code: requiredString('Product code is required'),
+    barcode: optionalString(),
+    product_name: requiredString('Product name is required'),
+    category: requiredString('Category is required'),
+    description: requiredString('Description is required'),
+    pricing_inventory: pricingInventorySchema,
+    price_summary: priceSummarySchema.optional(),
+}).refine((data) => {
+    // Ensure selling_price >= cost_price for logical consistency
+    if (data.pricing_inventory.selling_price < data.pricing_inventory.cost_price) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Selling price should be greater than or equal to cost price',
+    path: ['pricing_inventory', 'selling_price'],
+});
+
+/**
+ * Invoice status update validation schema
+ */
+export const invoiceStatusSchema = z.object({
+    status: z.enum(['Pending', 'Paid', 'Partially Paid', 'Overdue', 'Cancelled'], {
+        errorMap: () => ({ message: 'Status must be one of: Pending, Paid, Partially Paid, Overdue, Cancelled' })
+    }),
+    payment_amount: z.number().min(0.01, 'Payment amount must be greater than 0').optional(),
+    payment_method: optionalString(),
+    payment_notes: optionalString()
+}).refine((data) => {
+    // If status is Partially Paid, payment_amount is required
+    if (data.status === 'Partially Paid' && data.payment_amount === undefined) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Payment amount is required when status is Partially Paid',
+    path: ['payment_amount'],
+});
+
+/**
+ * Estimate status update validation schema
+ */
+export const estimateStatusSchema = z.object({
+    status: z.enum(['Draft', 'Pending', 'Accepted', 'Rejected', 'Expired'], {
+        errorMap: () => ({ message: 'Status must be one of: Draft, Pending, Accepted, Rejected, Expired' })
+    })
+});
+
+/**
+ * Invoice item validation schema
+ */
+const invoiceItemSchema = z.object({
+    product_id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid product ID format'),
+    quantity: requiredNumber(0.01, undefined, 'Quantity must be greater than 0'),
+    unit_price: requiredNumber(0, undefined, 'Unit price must be 0 or greater'),
+});
+
+/**
+ * Invoice validation schema
+ */
+export const invoiceSchema = z.object({
+    customer_id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid customer ID format'),
+    items: requiredArray(invoiceItemSchema, 'At least one item is required'),
+    tax_type: z.enum(['percentage', 'fixed']).optional(),
+    tax_value: optionalNumber(0),
+    discount_type: z.enum(['percentage', 'fixed']).optional(),
+    discount_value: optionalNumber(0),
+    paymentTerms: requiredString('Payment terms are required'),
+    deposit_received: optionalNumber(0),
+    notes: optionalString(),
+    signature: optionalString(),
+    sales_rep_id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid sales representative ID format'),
+    estimate_id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid estimate ID format').optional(),
+}).refine((data) => {
+    // If tax_type is provided, tax_value must be provided
+    if (data.tax_type && data.tax_value === undefined) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Tax value is required when tax type is specified',
+    path: ['tax_value'],
+}).refine((data) => {
+    // If discount_type is provided, discount_value must be provided
+    if (data.discount_type && data.discount_value === undefined) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Discount value is required when discount type is specified',
+    path: ['discount_value'],
+}).refine((data) => {
+    // If tax_type is percentage, tax_value should be between 0 and 100
+    if (data.tax_type === 'percentage' && data.tax_value !== undefined) {
+        return data.tax_value >= 0 && data.tax_value <= 100;
+    }
+    return true;
+}, {
+    message: 'Tax percentage must be between 0 and 100',
+    path: ['tax_value'],
+}).refine((data) => {
+    // If discount_type is percentage, discount_value should be between 0 and 100
+    if (data.discount_type === 'percentage' && data.discount_value !== undefined) {
+        return data.discount_value >= 0 && data.discount_value <= 100;
+    }
+    return true;
+}, {
+    message: 'Discount percentage must be between 0 and 100',
+    path: ['discount_value'],
+});
+
+/**
+ * Receipt item validation schema
+ */
+const receiptItemSchema = z.object({
+    product_id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid product ID format'),
+    quantity: requiredNumber(0.01, undefined, 'Quantity must be greater than 0'),
+    unit_price: requiredNumber(0, undefined, 'Unit price must be 0 or greater'),
+    discount_percentage: optionalNumber(0, 100),
+});
+
+/**
+ * Receipt validation schema
+ */
+export const receiptSchema = z.object({
+    customer_id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid customer ID format'),
+    items: requiredArray(receiptItemSchema, 'At least one item is required'),
+    tax_type: z.enum(['percentage', 'fixed']).optional(),
+    tax_value: optionalNumber(0),
+    discount_type: z.enum(['percentage', 'fixed']).optional(),
+    discount_value: optionalNumber(0),
+    deposit_received: optionalNumber(0),
+    billing_address: requiredString('Billing address is required'),
+    shipping_address: requiredString('Shipping address is required'),
+    notes: optionalString(),
+    signature: optionalString(),
+    sales_rep_id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid sales representative ID format'),
+    invoice_id: z.string().regex(/^[0-9a-fA-F]{24}$/, 'Invalid invoice ID format').optional(),
+}).refine((data) => {
+    // If tax_type is provided, tax_value must be provided
+    if (data.tax_type && data.tax_value === undefined) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Tax value is required when tax type is specified',
+    path: ['tax_value'],
+}).refine((data) => {
+    // If discount_type is provided, discount_value must be provided
+    if (data.discount_type && data.discount_value === undefined) {
+        return false;
+    }
+    return true;
+}, {
+    message: 'Discount value is required when discount type is specified',
+    path: ['discount_value'],
+}).refine((data) => {
+    // If tax_type is percentage, tax_value should be between 0 and 100
+    if (data.tax_type === 'percentage' && data.tax_value !== undefined) {
+        return data.tax_value >= 0 && data.tax_value <= 100;
+    }
+    return true;
+}, {
+    message: 'Tax percentage must be between 0 and 100',
+    path: ['tax_value'],
+}).refine((data) => {
+    // If discount_type is percentage, discount_value should be between 0 and 100
+    if (data.discount_type === 'percentage' && data.discount_value !== undefined) {
+        return data.discount_value >= 0 && data.discount_value <= 100;
+    }
+    return true;
+}, {
+    message: 'Discount percentage must be between 0 and 100',
+    path: ['discount_value'],
+});
+

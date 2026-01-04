@@ -19,7 +19,8 @@ import estimateRoutes from './routes/Estimate';
 const app = express();
 
 // Validate and set PORT with proper error handling
-const PORT = process.env.PORT || 5000;
+// const PORT = process.env.PORT || 5000;
+const PORT = 5500;
 
 // Middleware
 app.use(cors());

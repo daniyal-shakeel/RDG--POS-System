@@ -37,7 +37,7 @@ export function Sidebar() {
       {/* Logo */}
       <div className="p-4 xl:p-6 border-b border-sidebar-border">
         <h1 className="font-display text-lg xl:text-xl font-bold text-gradient">
-          Royal Dates Galore
+          XYZ Company Ltd.
         </h1>
         <p className="text-xs text-muted-foreground mt-1">POS System</p>
       </div>

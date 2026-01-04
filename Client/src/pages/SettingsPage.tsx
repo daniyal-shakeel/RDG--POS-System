@@ -88,7 +88,7 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
               <Label className="text-xs sm:text-sm">Company Name</Label>
-              <Input defaultValue="The Royal Dates Galore Ltd." className="text-sm" />
+              <Input defaultValue="The XYZ Company Ltd. Ltd." className="text-sm" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs sm:text-sm">Phone</Label>
