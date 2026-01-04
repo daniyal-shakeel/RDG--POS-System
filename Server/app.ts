@@ -10,11 +10,10 @@ dotenv.config({ path: envPath });
 import express, { Request, Response } from 'express';
 import cors from 'cors';
 import connectDB from './config/db';
-import customerRoutes from './routes/Customer';
-import productRoutes from './routes/Product';
-import invoiceRoutes from './routes/Invoice';
-import receiptRoutes from './routes/Receipt';
-import estimateRoutes from './routes/Estimate';
+import customerRouter from './routes/Customer';
+import authRouter from './routes/Auth';
+import userRouter from './routes/User';
+
 
 const app = express();
 
@@ -22,6 +21,13 @@ const app = express();
 // const PORT = process.env.PORT || 5000;
 const PORT = 5500;
 
+export const SUPER_ADMIN_EMAIL: string = process.env.SUPER_ADMIN_EMAIL || '';
+export const SUPER_ADMIN_PASSWORD: string = process.env.SUPER_ADMIN_PASSWORD || '';
+
+if(!SUPER_ADMIN_EMAIL || !SUPER_ADMIN_PASSWORD) {
+  console.error('SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD must be set');
+  process.exit(1);
+}
 // Middleware
 app.use(cors());
 app.use(express.json({ limit: '10mb' })); // Limit JSON payload size to prevent DoS
@@ -46,11 +52,9 @@ app.use((err: Error, _req: Request, res: Response, _next: Function): void => {
   });
 });
 
-app.use('/api/v1/customer', customerRoutes);
-app.use('/api/v1/product', productRoutes);
-app.use('/api/v1/invoice', invoiceRoutes);
-app.use('/api/v1/receipt', receiptRoutes);
-app.use('/api/v1/estimate', estimateRoutes);
+app.use('/api/v1/user', userRouter);
+app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/customer', customerRouter);
 
 // 404 handler
 app.use((_req: Request, res: Response): void => {

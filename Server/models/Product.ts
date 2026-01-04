@@ -1,149 +1,44 @@
-import mongoose, {Document} from "mongoose";
+import { Schema, model, Document, Types } from 'mongoose';
 
-interface PricingInventory {
-    selling_price: number;
-    cost_price: number;
-    current_stock: number;
-    minimum_stock_alert: number;
+/**
+ * Product represents a sellable item.  It references a category and may
+ * optionally refer to a tax profile.  Products can be marked as active
+ * or archived to remove them from catalog listings without deletion.
+ */
+export interface IProduct extends Document {
+  name: string;
+  sku: string;
+  barcode?: string;
+  category: Types.ObjectId;
+  description?: string;
+  images?: string[];
+  unit?: string;
+  trackInventory: boolean;
+  allowBackorder: boolean;
+  costPrice: number;
+  salePrice: number;
+  taxProfile?: Types.ObjectId;
+  discountable: boolean;
+  status: 'active' | 'archived';
+  createdAt: Date;
+  updatedAt: Date;
 }
 
-interface PriceSummary {
-    selling_price: number;
-    cost_price: number;
-    profit_margin: number;
-}
+const ProductSchema = new Schema<IProduct>({
+  name: { type: String, required: true },
+  sku: { type: String, required: true, unique: true },
+  barcode: { type: String },
+  category: { type: Schema.Types.ObjectId, ref: 'Category', required: true },
+  description: { type: String },
+  images: { type: [String], default: [] },
+  unit: { type: String },
+  trackInventory: { type: Boolean, default: true },
+  allowBackorder: { type: Boolean, default: false },
+  costPrice: { type: Number, required: true },
+  salePrice: { type: Number, required: true },
+  taxProfile: { type: Schema.Types.ObjectId, ref: 'TaxProfile' },
+  discountable: { type: Boolean, default: true },
+  status: { type: String, enum: ['active', 'archived'], default: 'active' },
+}, { timestamps: true });
 
-interface Product extends Document {
-    product_code: string;
-    barcode?: string;
-    product_name: string;
-    category: string;
-    description: string;
-    pricing_inventory: PricingInventory;
-    price_summary?: PriceSummary;
-    stock_status?: 'in stock' | 'low stock' | 'out of stock';
-    createdAt?: Date;
-    updatedAt?: Date;
-}
-
-const pricingInventorySchema = new mongoose.Schema({
-    selling_price: {
-        type: Number,
-        required: true,
-        min: 0
-    },
-    cost_price: {
-        type: Number,
-        required: true,
-        min: 0
-    },
-    current_stock: {
-        type: Number,
-        required: true,
-        min: 0
-    },
-    minimum_stock_alert: {
-        type: Number,
-        required: true,
-        min: 0
-    }
-}, { _id: false });
-
-const priceSummarySchema = new mongoose.Schema({
-    selling_price: {
-        type: Number,
-        required: true,
-        min: 0
-    },
-    cost_price: {
-        type: Number,
-        required: true,
-        min: 0
-    },
-    profit_margin: {
-        type: Number,
-        required: true
-    }
-}, { _id: false });
-
-const productSchema = new mongoose.Schema({
-    product_code: {
-        type: String,
-        required: true,
-        unique: true,
-        trim: true
-    },
-    barcode: {
-        type: String,
-        unique: true,
-        trim: true
-    },
-    product_name: {
-        type: String,
-        required: true,
-        trim: true
-    },
-    category: {
-        type: String,
-        required: true,
-        trim: true
-    },
-    description: {
-        type: String,
-        required: true
-    },
-    pricing_inventory: {
-        type: pricingInventorySchema,
-        required: true
-    },
-    price_summary: {
-        type: priceSummarySchema,
-        required: false
-    },
-    stock_status: {
-        type: String,
-        enum: ['in stock', 'low stock', 'out of stock'],
-        default: 'in stock'
-    }
-}, {
-    timestamps: true
-});
-
-// Helper function to calculate stock status
-const calculateStockStatus = (currentStock: number, minimumStockAlert: number): 'in stock' | 'low stock' | 'out of stock' => {
-    if (currentStock === 0) {
-        return 'out of stock';
-    } else if (currentStock <= minimumStockAlert) {
-        return 'low stock';
-    } else {
-        return 'in stock';
-    }
-};
-
-// Pre-save hook to calculate profit_margin in price_summary and stock_status
-productSchema.pre('save', function(this: Product) {
-    if (this.pricing_inventory) {
-        // Always calculate price_summary from pricing_inventory
-        if (!this.price_summary) {
-            this.price_summary = {
-                selling_price: 0,
-                cost_price: 0,
-                profit_margin: 0
-            };
-        }
-        this.price_summary.selling_price = this.pricing_inventory.selling_price;
-        this.price_summary.cost_price = this.pricing_inventory.cost_price;
-        this.price_summary.profit_margin = this.pricing_inventory.selling_price - this.pricing_inventory.cost_price;
-        
-        // Calculate stock_status based on current_stock and minimum_stock_alert
-        this.stock_status = calculateStockStatus(
-            this.pricing_inventory.current_stock,
-            this.pricing_inventory.minimum_stock_alert
-        );
-    }
-});
-
-const Product = mongoose.model<Product>("Product", productSchema);
-
-export {Product, PricingInventory, PriceSummary};
-
+export default model<IProduct>('Product', ProductSchema);

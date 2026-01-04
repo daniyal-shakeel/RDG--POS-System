@@ -1,5 +1,5 @@
 export const COMPANY_INFO = {
-  name: 'Royal Dates Galore Ltd.',
+  name: 'XYZ Company Ltd. Ltd.',
   address: '22 Macoya Road West, Macoya Industrial Estate, Tunapuna',
   country: 'Trinidad & Tobago',
   phone: '+1(868)739-5025',
