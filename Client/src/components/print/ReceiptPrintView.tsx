@@ -17,7 +17,7 @@ export function ReceiptPrintView({ document }: ReceiptPrintViewProps) {
     <div className="receipt-print print-only bg-background text-foreground font-mono text-xs">
       {/* Header */}
       <div className="text-center mb-4">
-        <p className="font-bold text-sm">THE ROYAL DATES GALORE LTD.</p>
+        <p className="font-bold text-sm">THE XYZ Company Ltd. LTD.</p>
         <p>22 Macoya Road West</p>
         <p>Macoya Industrial Estate, Tunapuna</p>
         <p>Trinidad & Tobago</p>
