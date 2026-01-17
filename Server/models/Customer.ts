@@ -4,11 +4,11 @@ import { Schema, model, Document } from 'mongoose';
  * Address subdocument used for billing and shipping addresses on a customer.
  */
 interface IAddress {
-  street?: string;
   city?: string;
-  state?: string;
-  postalCode?: string;
   country?: string;
+  postalCode?: string;
+  state?: string;
+  street?: string;
 }
 
 /**

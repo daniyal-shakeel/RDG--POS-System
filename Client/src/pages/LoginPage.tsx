@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePOS } from '@/contexts/POSContext';
+import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -21,15 +22,20 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
-        toast.success('Welcome back!');
-        navigate('/');
-      } else {
-        setError('Invalid credentials. Please try again.');
-      }
-    } catch {
-      setError('An error occurred. Please try again.');
+      // Prepare data for backend
+      const loginData = {
+        email: email.trim(),
+        password: password,
+      };
+
+      const response = await axios.post('http://localhost:5500/api/v1/auth/login', loginData);
+      
+      toast.success(response.data.message || 'Login successful');
+      navigate('/');
+    } catch (error: any) {
+      const errorMessage = error.response?.data?.message || 'An error occurred. Please try again.';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

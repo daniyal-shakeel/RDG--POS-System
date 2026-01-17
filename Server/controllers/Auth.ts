@@ -4,9 +4,7 @@ import bcrypt from "bcryptjs";
 import User from "../models/User";
 import { validateEmail } from "../utils/validation";
 import { SUPER_ADMIN_EMAIL, SUPER_ADMIN_PASSWORD } from "../app";
-const JWT_SECRET: string = process.env.JWT_SECRET || "your-secret-key-change-in-production";
-const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || "7d";
-
+import { JWT_SECRET, JWT_EXPIRES_IN } from "../app";
 // Super Admin credentials from environment variables
 type LoginBody = {
   email: string;
@@ -175,6 +173,8 @@ const login = async (req: Request, res: Response) => {
       permissions: selectedRole.permissionKeys || [],
     };
 
+    console.log(tokenPayload, "tokenPayload");
+    console.log(JWT_SECRET, "JWT_SECRET");
     const token = jwt.sign(tokenPayload, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN,
     } as jwt.SignOptions);
