@@ -135,13 +135,36 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     }
   };
 
+  // Helper function to get base product name from description
+  const getBaseProductName = (description: string): string => {
+    // If description already has the format "Product Name - quantity X - discount Y%", extract base name
+    const match = description.match(/^(.+?)\s*-\s*quantity/i);
+    return match ? match[1].trim() : description;
+  };
+
+  // Helper function to format description with quantity and discount
+  const formatDescription = (baseName: string, quantity: number, discount: number): string => {
+    if (discount > 0) {
+      return `${baseName} - quantity ${quantity} - discount ${discount}%`;
+    }
+    return baseName;
+  };
+
   const updateItem = (index: number, field: keyof LineItem, value: string | number) => {
     const updated = [...items];
+    const currentItem = updated[index];
+    const baseName = getBaseProductName(currentItem.description);
+    
     (updated[index] as any)[field] = value;
     
     // Recalculate amount
     const item = updated[index];
     item.amount = item.quantity * item.unitPrice * (1 - item.discount / 100);
+    
+    // Auto-format description when discount or quantity changes
+    if (field === 'discount' || field === 'quantity') {
+      item.description = formatDescription(baseName, item.quantity, item.discount);
+    }
     
     setItems(updated);
   };
@@ -154,21 +177,32 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     const product = mockProducts.find(p => p.code === code);
     if (product) {
       const updated = [...items];
+      const currentItem = updated[index];
+      const description = formatDescription(
+        product.name,
+        currentItem.quantity,
+        currentItem.discount
+      );
       updated[index] = {
         ...updated[index],
         productCode: product.code,
-        description: product.name,
+        description,
         unitPrice: product.price,
-        amount: updated[index].quantity * product.price * (1 - updated[index].discount / 100)
+        amount: currentItem.quantity * product.price * (1 - currentItem.discount / 100)
       };
       setItems(updated);
     }
   };
 
+  // Calculate subtotal before discounts
+  const subtotalBeforeDiscount = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+  // Calculate subtotal after discounts (current amount)
   const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
-  const discountAmount = subtotal * 0.05; // 5% general discount
-  const tax = (subtotal - discountAmount) * 0.125; // 12.5% VAT
-  const total = subtotal - discountAmount + tax;
+  // Calculate total discount amount
+  const discountAmount = subtotalBeforeDiscount - subtotal;
+  // VAT only applies to invoices
+  const tax = type === 'invoice' ? subtotal * 0.125 : 0; // 12.5% VAT
+  const total = subtotal + tax;
   const balanceDue = total - deposit;
 
   const formatCurrency = (amount: number) => {
@@ -383,10 +417,10 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                     <TableRow>
                       <TableHead className="w-28">Code</TableHead>
                       <TableHead>Description</TableHead>
-                      <TableHead className="w-16 text-right">Qty</TableHead>
-                      <TableHead className="w-24 text-right">Price</TableHead>
-                      <TableHead className="w-16 text-right">Disc%</TableHead>
-                      <TableHead className="w-24 text-right">Amount</TableHead>
+                      <TableHead className="w-16 text-center">Qty</TableHead>
+                      <TableHead className="w-24 text-center">Price</TableHead>
+                      <TableHead className="w-16 text-center">Disc%</TableHead>
+                      <TableHead className="w-24 text-center">Amount</TableHead>
                       <TableHead className="w-10"></TableHead>
                     </TableRow>
                   </TableHeader>
@@ -405,7 +439,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                               value={item.productCode}
                               onValueChange={(v) => selectProduct(index, v)}
                             >
-                              <SelectTrigger className="h-8 text-xs">
+                              <SelectTrigger className="h-8 text-xs w-[110px]">
                                 <SelectValue placeholder="Select..." />
                               </SelectTrigger>
                               <SelectContent>
@@ -417,11 +451,11 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          <TableCell>
+                          <TableCell >
                             <Input
                               value={item.description}
                               onChange={(e) => updateItem(index, 'description', e.target.value)}
-                              className="h-8 text-xs"
+                              className="h-8 text-xs pl-4 "
                             />
                           </TableCell>
                           <TableCell>
@@ -430,7 +464,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                               min="1"
                               value={item.quantity}
                               onChange={(e) => updateItem(index, 'quantity', parseInt(e.target.value) || 1)}
-                              className="h-8 text-xs text-right"
+                              className="h-8 text-xs  w-[80px] text-center"
                             />
                           </TableCell>
                           <TableCell>
@@ -440,7 +474,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                               min="0"
                               value={item.unitPrice}
                               onChange={(e) => updateItem(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                              className="h-8 text-xs text-right"
+                              className="h-8 text-xs text-center w-[80px]"
                             />
                           </TableCell>
                           <TableCell>
@@ -450,7 +484,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                               max="100"
                               value={item.discount}
                               onChange={(e) => updateItem(index, 'discount', parseFloat(e.target.value) || 0)}
-                              className="h-8 text-xs text-right"
+                              className="h-8 text-xs text-center w-[80px] "
                             />
                           </TableCell>
                           <TableCell className="text-right font-medium text-sm">
@@ -614,16 +648,12 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             )}
 
             {/* Summary */}
-            <div className="glass-card rounded-xl p-4 sm:p-6">
+            <div className="glass-card rounded-xl p-4 sm:p-6 ">
               <h2 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Summary</h2>
               <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Subtotal</span>
-                  <span>{formatCurrency(subtotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Discount (5%)</span>
-                  <span className="text-destructive">-{formatCurrency(discountAmount)}</span>
+                  <span>{formatCurrency(subtotalBeforeDiscount)}</span>
                 </div>
                 {type === 'invoice' && (
                   <div className="flex justify-between">
