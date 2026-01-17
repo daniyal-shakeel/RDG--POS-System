@@ -655,18 +655,6 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>{formatCurrency(subtotalBeforeDiscount)}</span>
                 </div>
-                {discountAmount > 0 && (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Discount</span>
-                      <span className="text-destructive">-{formatCurrency(discountAmount)}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Subtotal (after discount)</span>
-                      <span>{formatCurrency(subtotal)}</span>
-                    </div>
-                  </>
-                )}
                 {type === 'invoice' && (
                   <div className="flex justify-between">
                   <span className="text-muted-foreground">VAT (12.5%)</span>
