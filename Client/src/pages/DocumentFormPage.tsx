@@ -63,9 +63,20 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
   const [terms, setTerms] = useState('Net 15');
   const [message, setMessage] = useState('');
   const [salesRep, setSalesRep] = useState(user?.name || mockSalesReps[0]);
+  // Signature stored as base64 string (without data URL prefix) - ready for API transmission
   const [signature, setSignature] = useState<string | undefined>();
   const [deposit, setDeposit] = useState(0);
   const [refNumber] = useState(generateRefNumber(type));
+
+  // Helper to normalize signature format - extract base64 from data URL if needed
+  // This ensures signatures are stored as plain base64 strings for API transmission
+  const normalizeSignature = (sig: string | undefined): string | undefined => {
+    if (!sig) return undefined;
+    // If it's already just base64 (no data URL prefix), return as-is
+    if (!sig.startsWith('data:')) return sig;
+    // Otherwise, extract the base64 portion (remove 'data:image/png;base64,' prefix)
+    return sig.split(',')[1] || sig;
+  };
 
   // Load existing document if editing
   useEffect(() => {
@@ -77,7 +88,8 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         setTerms(doc.terms || 'Net 15');
         setMessage(doc.message || '');
         setSalesRep(doc.salesRep);
-        setSignature(doc.signature);
+        // Normalize signature format to base64 string (ready for API)
+        setSignature(normalizeSignature(doc.signature));
         setDeposit(doc.deposit);
       }
     }
@@ -193,6 +205,8 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       deposit,
       status,
       salesRep,
+      // Signature is stored as base64 string (without data URL prefix) - ready for API transmission
+      // Backend can reconstruct data URL if needed: `data:image/png;base64,${signature}`
       signature,
       message,
       createdAt: new Date(),
@@ -257,7 +271,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" onClick={handleExport} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
+            {/* <Button variant="outline" onClick={handleExport} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
               <Send className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Export</span>
             </Button>
@@ -270,15 +284,15 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             >
               <Printer className="h-4 w-4 sm:mr-2" />
               <span className="hidden sm:inline">Print</span>
-            </Button>
+            </Button> */}
             <Button variant="outline" onClick={() => handleSave('draft')} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
               <span className="sm:hidden">Draft</span>
               <span className="hidden sm:inline">Save Draft</span>
             </Button>
             <Button onClick={() => handleSave('pending')} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
               <Save className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Save & Send</span>
-              <span className="sm:hidden">Save</span>
+              <span className="hidden sm:inline">Save & Print</span>
+              <span className="sm:hidden">Save & Print</span>
             </Button>
           </div>
         </div>
@@ -556,6 +570,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                 <SignaturePad
                   onSave={(sig) => setSignature(sig)}
                   onClear={() => setSignature(undefined)}
+                  initialSignature={signature}
                 />
               </div>
             </div>
@@ -583,7 +598,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             )}
 
             {/* Deposit */}
-            {(type === 'estimate' || type === 'invoice') && (
+            {( type === 'invoice') && (
               <div className="glass-card rounded-xl p-4 sm:p-6">
                 <h2 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Deposit Received</h2>
                 <Input
@@ -610,10 +625,13 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                   <span className="text-muted-foreground">Discount (5%)</span>
                   <span className="text-destructive">-{formatCurrency(discountAmount)}</span>
                 </div>
-                <div className="flex justify-between">
+                {type === 'invoice' && (
+                  <div className="flex justify-between">
                   <span className="text-muted-foreground">VAT (12.5%)</span>
                   <span>{formatCurrency(tax)}</span>
                 </div>
+                )}
+                
                 <div className="border-t border-border pt-2 sm:pt-3 flex justify-between font-semibold text-sm sm:text-base">
                   <span>Total</span>
                   <span className="text-primary">{formatCurrency(total)}</span>

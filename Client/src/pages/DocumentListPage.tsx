@@ -23,6 +23,7 @@ import { Plus, Search, Filter, Printer, Eye, FileDown, ArrowRight } from 'lucide
 import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { DocumentStatus, DocumentType } from '@/types/pos';
+import { ESTIMATE_STATUS_FILTER_OPTIONS, EstimateStatus } from '@/constants/estimateStatuses';
 
 interface DocumentListPageProps {
   type: DocumentType;
@@ -90,14 +91,11 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="approved">Approved</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="partial">Partial</SelectItem>
-              <SelectItem value="overdue">Overdue</SelectItem>
-              <SelectItem value="cancelled">Cancelled</SelectItem>
+              {ESTIMATE_STATUS_FILTER_OPTIONS.map((option) => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>
@@ -165,7 +163,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => triggerPrint(doc.id)} disabled={deviceStatus.rp4 !== 'connected'}>
                           <Printer className="h-4 w-4" />
                         </Button>
-                        {type === 'estimate' && doc.status === 'approved' && (
+                        {type === 'estimate' && (String(doc.status) === 'accepted' || doc.status === 'approved') && (
                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleConvertToInvoice(doc.id)} title="Convert to Invoice">
                             <ArrowRight className="h-4 w-4" />
                           </Button>
