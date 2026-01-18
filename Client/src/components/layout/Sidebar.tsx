@@ -59,7 +59,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
     )}>
       {/* Logo & Minimize Button */}
       <div className="p-4 xl:p-4 border-b border-sidebar-border flex items-center justify-between">
-        {!isCollapsed ? (
+        {!isCollapsed && (
           <>
             <div className="flex-1">
               <h1 className="font-display text-lg xl:text-xl font-bold text-gradient">
@@ -67,28 +67,22 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
               </h1>
               <p className="text-xs text-muted-foreground mt-1">POS System</p>
             </div>
-            <button
-              onClick={onToggleCollapse}
-              className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors"
-              aria-label="Collapse sidebar"
-            >
-              <PanelLeftClose className="h-5 w-5" />
-            </button>
           </>
-        ) : (
-          <div className="flex flex-col items-center gap-2 w-full">
-            <h1 className="font-display text-xs font-bold text-gradient text-center">
-              XYZ
-            </h1>
-            <button
-              onClick={onToggleCollapse}
-              className="p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors"
-              aria-label="Expand sidebar"
-            >
-              <PanelLeftOpen className="h-5 w-5" />
-            </button>
-          </div>
         )}
+        <button
+          onClick={onToggleCollapse}
+          className={cn(
+            "p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors",
+            isCollapsed && "mx-auto"
+          )}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-5 w-5" />
+          ) : (
+            <PanelLeftClose className="h-5 w-5" />
+          )}
+        </button>
       </div>
 
       {/* Device Status */}
@@ -146,35 +140,30 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
       </nav>
 
       {/* User Profile */}
-      <div className="p-3 xl:p-4 border-t border-sidebar-border">
-        <div className={cn(
-          "flex items-center",
-          isCollapsed ? "justify-center" : "gap-2 xl:gap-3 mb-2 xl:mb-3"
-        )}>
-          <div className="h-8 w-8 xl:h-10 xl:w-10 rounded-full bg-primary/20 flex items-center justify-center">
-            <span className="text-primary font-semibold text-xs xl:text-sm">
-              {user?.name?.charAt(0) || 'U'}
-            </span>
-          </div>
-          {!isCollapsed && (
+      {!isCollapsed && (
+        <div className="p-3 xl:p-4 border-t border-sidebar-border">
+          <div className="flex items-center gap-2 xl:gap-3 mb-2 xl:mb-3">
+            <div className="h-8 w-8 xl:h-10 xl:w-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <span className="text-primary font-semibold text-xs xl:text-sm">
+                {user?.name?.charAt(0) || 'U'}
+              </span>
+            </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs xl:text-sm font-medium truncate">{user?.name || 'Guest'}</p>
               <p className="text-[10px] xl:text-xs text-muted-foreground capitalize">
                 {user?.role?.replace('_', ' ') || 'Not logged in'}
               </p>
             </div>
-          )}
-        </div>
-        {!isCollapsed && (
+          </div>
           <button
-            onClick={handleLogout}
+            onClick={logout}
             className="flex items-center gap-2 w-full px-3 xl:px-4 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
           >
             <LogOut className="h-3.5 w-3.5 xl:h-4 xl:w-4" />
             Sign Out
           </button>
-        )}
-      </div>
+        </div>
+      )}
     </aside>
   );
 }

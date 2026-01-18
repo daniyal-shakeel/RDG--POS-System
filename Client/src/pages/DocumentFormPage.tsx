@@ -142,8 +142,11 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     return match ? match[1].trim() : description;
   };
 
-  // Helper function to format description (no discount in description)
-  const formatDescription = (baseName: string): string => {
+  // Helper function to format description with quantity and discount
+  const formatDescription = (baseName: string, quantity: number, discount: number): string => {
+    if (discount > 0) {
+      return `${baseName} - quantity ${quantity} - discount ${discount}%`;
+    }
     return baseName;
   };
 
@@ -158,7 +161,10 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     const item = updated[index];
     item.amount = item.quantity * item.unitPrice * (1 - item.discount / 100);
     
-    // Description remains unchanged when discount or quantity changes
+    // Auto-format description when discount or quantity changes
+    if (field === 'discount' || field === 'quantity') {
+      item.description = formatDescription(baseName, item.quantity, item.discount);
+    }
     
     setItems(updated);
   };
@@ -172,7 +178,11 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     if (product) {
       const updated = [...items];
       const currentItem = updated[index];
-      const description = formatDescription(product.name);
+      const description = formatDescription(
+        product.name,
+        currentItem.quantity,
+        currentItem.discount
+      );
       updated[index] = {
         ...updated[index],
         productCode: product.code,
@@ -445,8 +455,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                             <Input
                               value={item.description}
                               onChange={(e) => updateItem(index, 'description', e.target.value)}
-                              className="h-8 text-xs pl-4 disabled:opacity-100"
-                              disabled={true}
+                              className="h-8 text-xs pl-4 "
                             />
                           </TableCell>
                           <TableCell>
