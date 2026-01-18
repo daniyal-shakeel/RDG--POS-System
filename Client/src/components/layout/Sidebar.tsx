@@ -19,8 +19,6 @@ import {
 import { usePOS } from '@/contexts/POSContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
-import { usePermissions } from '@/hooks/usePermissions';
-import { useMemo } from 'react';
 
 const navItemsConfig = [
   { 
@@ -123,6 +121,17 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
       return hasAnyPermission(item.permissions);
     });
   }, [hasAnyPermission, user?.permissions]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error: any) {
+      // Error is handled in logout function, but we still navigate
+      navigate('/login');
+    }
+  };
 
   const handleLogout = async () => {
     try {

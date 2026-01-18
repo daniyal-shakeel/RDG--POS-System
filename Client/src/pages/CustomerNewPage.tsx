@@ -205,17 +205,16 @@ const CustomerNewPage: React.FC = () => {
     
     setIsLoading(true);
     try {
-      let response;
+      // Get token from localStorage and add to Authorization header
+      const token = localStorage.getItem('token') || '';
+      const trimmedToken = token.trim();
       
-      if (isEditMode && id) {
-        // Update existing customer
-        response = await api.put(`/api/v1/customer/${id}`, customerData);
-        toast.success(response.data.message || 'Customer updated successfully');
-      } else {
-        // Create new customer
-        response = await api.post('/api/v1/customer', customerData);
-        toast.success(response.data.message || 'Customer created successfully');
-      }
+      const response = await axios.post('http://localhost:5500/api/v1/customer', customerData, {
+        headers: {
+          'Authorization': `Bearer ${trimmedToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
       
       navigate('/customers');
     } catch (error: any) {
@@ -225,10 +224,7 @@ const CustomerNewPage: React.FC = () => {
         localStorage.removeItem('user');
         navigate('/login');
       } else {
-        const errorMessage = isEditMode 
-          ? error.response?.data?.message || 'Failed to update customer'
-          : error.response?.data?.message || 'Failed to create customer';
-        toast.error(errorMessage);
+        toast.error(error.response?.data?.message || 'Failed to create customer');
       }
       console.error('Error:', error);
     } finally {
