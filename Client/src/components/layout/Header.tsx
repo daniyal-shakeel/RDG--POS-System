@@ -10,11 +10,38 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+
+interface Notification {
+  id: string;
+  title: string;
+  time: string;
+  icon?: string;
+}
 
 export function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const { triggerScan, deviceStatus } = usePOS();
   const navigate = useNavigate();
+
+  // Sample notifications - in a real app, this would come from an API or context
+  const notifications: Notification[] = [
+    {
+      id: '1',
+      title: 'User created an estimate for Customer 1',
+      time: '2:54 PM',
+    },
+    {
+      id: '2',
+      title: 'User created an invoice for Customer 2',
+      time: '2:51 PM',
+    },
+    {
+      id: '3',
+      title: 'User created a receipt for Customer 3',
+      time: '12:38 PM',
+    },
+  ];
 
   const handleScan = async () => {
     const barcode = await triggerScan();
@@ -78,12 +105,58 @@ export function Header() {
         </DropdownMenu>
 
         {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute -top-1 -right-1 h-4 w-4 bg-destructive rounded-full text-[10px] font-bold flex items-center justify-center text-destructive-foreground">
-            3
-          </span>
-        </Button>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button variant="ghost" size="icon" className="relative">
+              <Bell className="h-4 w-4" />
+              <span className="absolute -top-1 -right-1 h-4 w-4 bg-destructive rounded-full text-[10px] font-bold flex items-center justify-center text-destructive-foreground">
+                {notifications.length}
+              </span>
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent 
+            align="end" 
+            className="w-96 p-0 bg-background border-border"
+          >
+            <div className="flex flex-col">
+              {/* Notification Items */}
+              <div className="max-h-[400px] overflow-y-auto">
+                {notifications.map((notification) => (
+                  <div
+                    key={notification.id}
+                    className="flex items-start gap-3 p-4 border-b border-border hover:bg-muted/50 cursor-pointer transition-colors"
+                  >
+                    {/* Icon */}
+                    <div className="h-10 w-10 rounded-full bg-white flex items-center justify-center flex-shrink-0 border border-border">
+                      <span className="text-xs font-medium text-black">up</span>
+                    </div>
+                    {/* Content */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground leading-snug">
+                        {notification.title}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {notification.time}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {/* See all notifications link */}
+              <div className="p-3 border-t border-border">
+                <button
+                  className="text-sm text-primary hover:text-primary/80 font-medium w-full text-center"
+                  onClick={() => {
+                    // Navigate to notifications page or handle "see all"
+                    console.log('See all notifications');
+                  }}
+                >
+                  See all notifications
+                </button>
+              </div>
+            </div>
+          </PopoverContent>
+        </Popover>
       </div>
     </header>
   );

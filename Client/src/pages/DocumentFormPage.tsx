@@ -142,11 +142,8 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     return match ? match[1].trim() : description;
   };
 
-  // Helper function to format description with quantity and discount
-  const formatDescription = (baseName: string, quantity: number, discount: number): string => {
-    if (discount > 0) {
-      return `${baseName} - quantity ${quantity} - discount ${discount}%`;
-    }
+  // Helper function to format description (no discount in description)
+  const formatDescription = (baseName: string): string => {
     return baseName;
   };
 
@@ -161,10 +158,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     const item = updated[index];
     item.amount = item.quantity * item.unitPrice * (1 - item.discount / 100);
     
-    // Auto-format description when discount or quantity changes
-    if (field === 'discount' || field === 'quantity') {
-      item.description = formatDescription(baseName, item.quantity, item.discount);
-    }
+    // Description remains unchanged when discount or quantity changes
     
     setItems(updated);
   };
@@ -178,11 +172,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     if (product) {
       const updated = [...items];
       const currentItem = updated[index];
-      const description = formatDescription(
-        product.name,
-        currentItem.quantity,
-        currentItem.discount
-      );
+      const description = formatDescription(product.name);
       updated[index] = {
         ...updated[index],
         productCode: product.code,
@@ -455,7 +445,8 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                             <Input
                               value={item.description}
                               onChange={(e) => updateItem(index, 'description', e.target.value)}
-                              className="h-8 text-xs pl-4 "
+                              className="h-8 text-xs pl-4 disabled:opacity-100"
+                              disabled={true}
                             />
                           </TableCell>
                           <TableCell>
@@ -655,6 +646,23 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>{formatCurrency(subtotalBeforeDiscount)}</span>
                 </div>
+                {items.filter(item => item.discount > 0).map((item, index) => {
+                  const itemDiscountAmount = item.quantity * item.unitPrice * (item.discount / 100);
+                  const baseName = getBaseProductName(item.description);
+                  return (
+                    <div key={item.id}>
+                      {index === 0 && (
+                        <div className="text-muted-foreground mb-1">Discount</div>
+                      )}
+                      <div className="flex justify-between ml-0">
+                        <span className="text-muted-foreground">
+                          {baseName} - {item.discount}%
+                        </span>
+                        <span className="text-success">-{formatCurrency(itemDiscountAmount)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
                 {type === 'invoice' && (
                   <div className="flex justify-between">
                   <span className="text-muted-foreground">VAT (12.5%)</span>

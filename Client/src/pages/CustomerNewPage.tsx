@@ -128,12 +128,28 @@ const CustomerNewPage: React.FC = () => {
     
     setIsLoading(true);
     try {
-      const response = await axios.post('http://localhost:5500/api/v1/customer', customerData);
+      // Get token from localStorage and add to Authorization header
+      const token = localStorage.getItem('token') || '';
+      const trimmedToken = token.trim();
+      
+      const response = await axios.post('http://localhost:5500/api/v1/customer', customerData, {
+        headers: {
+          'Authorization': `Bearer ${trimmedToken}`,
+          'Content-Type': 'application/json',
+        },
+      });
       
       toast.success(response.data.message || 'Customer created successfully');
       navigate('/customers');
     } catch (error: any) {
-      toast.error(error.response?.data?.message || 'Failed to create customer');
+      if (error.response?.status === 401) {
+        toast.error('Authentication failed. Please log in again.');
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        navigate('/login');
+      } else {
+        toast.error(error.response?.data?.message || 'Failed to create customer');
+      }
       console.error('Error:', error);
     } finally {
       setIsLoading(false);
@@ -179,7 +195,7 @@ const CustomerNewPage: React.FC = () => {
                       <FormItem>
                         <FormLabel>Company/Customer Name</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter customer name" {...field} />
+                          <Input className="pl-4" placeholder="Enter customer name" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -238,7 +254,7 @@ const CustomerNewPage: React.FC = () => {
                       <FormItem>
                         <FormLabel>Street Address</FormLabel>
                         <FormControl>
-                          <Input placeholder="Enter street address" {...field} />
+                          <Input className="pl-4" placeholder="Enter street address" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
@@ -253,7 +269,7 @@ const CustomerNewPage: React.FC = () => {
                         <FormItem>
                           <FormLabel>City</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter city" {...field} />
+                            <Input className="pl-4" placeholder="Enter city" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -267,7 +283,7 @@ const CustomerNewPage: React.FC = () => {
                         <FormItem>
                           <FormLabel>State/Province</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter state" {...field} />
+                            <Input className="pl-4" placeholder="Enter state" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -283,7 +299,7 @@ const CustomerNewPage: React.FC = () => {
                         <FormItem>
                           <FormLabel>Postal Code</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter postal code" {...field} />
+                            <Input className="pl-4" placeholder="Enter postal code" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -297,7 +313,7 @@ const CustomerNewPage: React.FC = () => {
                         <FormItem>
                           <FormLabel>Country</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter country" {...field} />
+                            <Input className="pl-4" placeholder="Enter country" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -340,7 +356,7 @@ const CustomerNewPage: React.FC = () => {
                         <FormItem>
                           <FormLabel>Street Address</FormLabel>
                           <FormControl>
-                            <Input placeholder="Enter street address" {...field} />
+                            <Input className="pl-4" placeholder="Enter street address" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -355,7 +371,7 @@ const CustomerNewPage: React.FC = () => {
                           <FormItem>
                             <FormLabel>City</FormLabel>
                             <FormControl>
-                              <Input placeholder="Enter city" {...field} />
+                              <Input className="pl-4" placeholder="Enter city" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -369,7 +385,7 @@ const CustomerNewPage: React.FC = () => {
                           <FormItem>
                             <FormLabel>State/Province</FormLabel>
                             <FormControl>
-                              <Input placeholder="Enter state" {...field} />
+                              <Input className="pl-4" placeholder="Enter state" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -385,7 +401,7 @@ const CustomerNewPage: React.FC = () => {
                           <FormItem>
                             <FormLabel>Postal Code</FormLabel>
                             <FormControl>
-                              <Input placeholder="Enter postal code" {...field} />
+                              <Input className="pl-4" placeholder="Enter postal code" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -399,7 +415,7 @@ const CustomerNewPage: React.FC = () => {
                           <FormItem>
                             <FormLabel>Country</FormLabel>
                             <FormControl>
-                              <Input placeholder="Enter country" {...field} />
+                              <Input className="pl-4" placeholder="Enter country" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
