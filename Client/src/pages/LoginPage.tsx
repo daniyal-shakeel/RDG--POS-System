@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePOS } from '@/contexts/POSContext';
-import axios from 'axios';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -22,18 +21,23 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Prepare data for backend
-      const loginData = {
-        email: email.trim(),
-        password: password,
-      };
-
-      const response = await axios.post('http://localhost:5500/api/v1/auth/login', loginData);
+      // Use context login function which handles API call, token storage, and user data
+      await login(email.trim(), password);
       
-      toast.success(response.data.message || 'Login successful');
+      toast.success('Login successful');
       navigate('/');
     } catch (error: any) {
-      const errorMessage = error.response?.data?.message || 'An error occurred. Please try again.';
+      // Handle API errors
+      let errorMessage = 'An error occurred. Please try again.';
+      
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        errorMessage = 'Cannot connect to server. Please make sure the backend server is running on http://localhost:5500';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {

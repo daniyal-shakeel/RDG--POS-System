@@ -1,4 +1,4 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { usePOS } from '@/contexts/POSContext';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const navItems = [
   { path: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -37,7 +38,19 @@ interface SidebarProps {
 
 export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout, deviceStatus } = usePOS();
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error: any) {
+      // Error is handled in logout function, but we still navigate
+      navigate('/login');
+    }
+  };
 
   return (
     <aside className={cn(

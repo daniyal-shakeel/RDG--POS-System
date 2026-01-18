@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { StatCard } from '@/components/common/StatCard';
 import { StatusBadge } from '@/components/common/StatusBadge';
@@ -20,8 +21,17 @@ import { useNavigate } from 'react-router-dom';
 export default function Dashboard() {
   const { documents, triggerPrint, deviceStatus } = usePOS();
   const navigate = useNavigate();
+  const [currentTime, setCurrentTime] = useState(new Date());
 
   const recentDocuments = documents.slice(0, 5);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-TT', {
@@ -45,10 +55,10 @@ export default function Dashboard() {
           </div>
           <div className="text-right">
             <p className="text-xs xl:text-sm text-muted-foreground">
-              {format(new Date(), 'EEEE, MMMM d, yyyy')}
+              {format(currentTime, 'EEEE, MMMM d, yyyy')}
             </p>
             <p className="text-base xl:text-lg font-mono font-semibold text-primary">
-              {format(new Date(), 'HH:mm:ss')}
+              {format(currentTime, 'HH:mm:ss')}
             </p>
           </div>
         </div>

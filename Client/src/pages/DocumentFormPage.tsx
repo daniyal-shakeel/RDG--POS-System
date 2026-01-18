@@ -655,6 +655,23 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                   <span className="text-muted-foreground">Subtotal</span>
                   <span>{formatCurrency(subtotalBeforeDiscount)}</span>
                 </div>
+                {items.filter(item => item.discount > 0).map((item, index) => {
+                  const itemDiscountAmount = item.quantity * item.unitPrice * (item.discount / 100);
+                  const baseName = getBaseProductName(item.description);
+                  return (
+                    <div key={item.id}>
+                      {index === 0 && (
+                        <div className="text-muted-foreground mb-1">Discount</div>
+                      )}
+                      <div className="flex justify-between ml-0">
+                        <span className="text-muted-foreground">
+                          {baseName} - {item.discount}%
+                        </span>
+                        <span className="text-success">-{formatCurrency(itemDiscountAmount)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
                 {type === 'invoice' && (
                   <div className="flex justify-between">
                   <span className="text-muted-foreground">VAT (12.5%)</span>
