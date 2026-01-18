@@ -13,22 +13,83 @@ import {
   Smartphone,
   Printer,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  UserCog
 } from 'lucide-react';
 import { usePOS } from '@/contexts/POSContext';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { usePermissions } from '@/hooks/usePermissions';
+import { useMemo } from 'react';
 
-const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/invoices', label: 'Invoices', icon: FileText },
-  { path: '/receipts', label: 'Receipts', icon: Receipt },
-  { path: '/credit-notes', label: 'Credit Notes', icon: CreditCard },
-  { path: '/refunds', label: 'Refunds', icon: RotateCcw },
-  { path: '/estimates', label: 'Estimates', icon: FileCheck },
-  { path: '/customers', label: 'Customers', icon: Users },
-  { path: '/inventory', label: 'Inventory', icon: Package },
-  { path: '/settings', label: 'Settings', icon: Settings }
+const navItemsConfig = [
+  { 
+    path: '/', 
+    label: 'Dashboard', 
+    icon: LayoutDashboard,
+    permissions: [
+      'invoice.read', 'invoice.*',
+      'receipt.read', 'receipt.*',
+      'customer.read', 'customer.*',
+      'credit_note.read', 'credit_note.*',
+      'refund.read', 'refund.*',
+      'estimate.read', 'estimate.*'
+    ] // Dashboard visible if user has access to documents/customers (not just inventory)
+  },
+  { 
+    path: '/invoices', 
+    label: 'Invoices', 
+    icon: FileText,
+    permissions: ['invoice.read', 'invoice.*']
+  },
+  { 
+    path: '/receipts', 
+    label: 'Receipts', 
+    icon: Receipt,
+    permissions: ['receipt.read', 'receipt.*']
+  },
+  { 
+    path: '/credit-notes', 
+    label: 'Credit Notes', 
+    icon: CreditCard,
+    permissions: ['credit_note.read', 'credit_note.*']
+  },
+  { 
+    path: '/refunds', 
+    label: 'Refunds', 
+    icon: RotateCcw,
+    permissions: ['refund.read', 'refund.*']
+  },
+  { 
+    path: '/estimates', 
+    label: 'Estimates', 
+    icon: FileCheck,
+    permissions: ['estimate.read', 'estimate.*']
+  },
+  { 
+    path: '/customers', 
+    label: 'Customers', 
+    icon: Users,
+    permissions: ['customer.read', 'customer.*']
+  },
+  { 
+    path: '/users', 
+    label: 'Users', 
+    icon: UserCog,
+    permissions: ['user.read']
+  },
+  { 
+    path: '/inventory', 
+    label: 'Inventory', 
+    icon: Package,
+    permissions: ['inventory.read', 'inventory.*', 'product.read', 'product.*']
+  },
+  { 
+    path: '/settings', 
+    label: 'Settings', 
+    icon: Settings,
+    permissions: [] // Empty array means visible to all authenticated users
+  }
 ];
 
 interface SidebarProps {
@@ -40,6 +101,28 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, deviceStatus } = usePOS();
+  const { hasPermission, hasAnyPermission } = usePermissions();
+
+  // Filter navigation items based on permissions
+  const navItems = useMemo(() => {
+    const userPermissions = user?.permissions || [];
+    const isSuperAdmin = userPermissions.includes('*');
+    
+    return navItemsConfig.filter(item => {
+      // Special handling for Super Admin only items
+      if ((item as any).isSuperAdminOnly) {
+        return isSuperAdmin;
+      }
+      
+      // If no permissions required, show to all authenticated users
+      if (!item.permissions || item.permissions.length === 0) {
+        return true;
+      }
+      
+      // Check if user has any of the required permissions
+      return hasAnyPermission(item.permissions);
+    });
+  }, [hasAnyPermission, user?.permissions]);
 
   const handleLogout = async () => {
     try {

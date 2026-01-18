@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { SalesDocument, User, DeviceStatus, Customer, UserRole } from '@/types/pos';
 import { mockDocuments, mockUser, mockCustomers } from '@/data/mockData';
 import { api } from '@/services/api';
+import { extractPermissionsFromRoles } from '@/utils/permissions';
 
 interface POSContextType {
   user: User | null;
@@ -32,9 +33,9 @@ const mapRoleToUserRole = (role: string): UserRole => {
     'Super Admin': 'admin',
     'Admin': 'admin',
     'Manager': 'manager',
+    'Stock-Keeper': 'warehouse',
     'Sales Rep': 'sales_rep',
     'Sales Representative': 'sales_rep',
-    'Warehouse': 'warehouse',
   };
   
   // Normalize role name (remove underscores, handle variations)
@@ -79,6 +80,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
       // Store token
       localStorage.setItem(TOKEN_KEY, token);
 
+      // Extract permissions - check if they're directly in permissions field or in roles array
+      let permissions: string[] = [];
+      if (userData.permissions && Array.isArray(userData.permissions)) {
+        // Permissions are directly available (from login response)
+        permissions = userData.permissions;
+      } else if (userData.roles && Array.isArray(userData.roles)) {
+        // Permissions are in roles array (from user creation/update response)
+        permissions = extractPermissionsFromRoles(userData.roles);
+      }
+
       // Map backend user data to frontend User type
       const mappedUser: User = {
         id: userData.id || userData._id || '',
@@ -86,6 +97,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
         email: userData.email || '',
         role: mapRoleToUserRole(userData.role || 'sales_rep'),
         avatar: userData.avatar,
+        permissions,
       };
 
       // Store user data

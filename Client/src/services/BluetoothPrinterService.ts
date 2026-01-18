@@ -211,7 +211,9 @@ class BluetoothPrinterService {
       if (data.discount > 0) {
         await this.sendText(`Discount:   -${this.formatCurrency(data.discount)}`);
       }
-      await this.sendText(`VAT (12.5%): ${this.formatCurrency(data.tax)}`);
+      if (data.tax > 0) {
+        await this.sendText(`VAT (12.5%): ${this.formatCurrency(data.tax)}`);
+      }
       await this.sendCommand(Commands.BOLD_ON);
       await this.sendText(`TOTAL:       ${this.formatCurrency(data.total)}`);
       await this.sendCommand(Commands.BOLD_OFF);

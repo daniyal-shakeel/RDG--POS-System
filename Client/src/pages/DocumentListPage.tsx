@@ -24,14 +24,24 @@ import { format } from 'date-fns';
 import { useNavigate } from 'react-router-dom';
 import { DocumentStatus, DocumentType } from '@/types/pos';
 import { ESTIMATE_STATUS_FILTER_OPTIONS, EstimateStatus } from '@/constants/estimateStatuses';
+import { useBluetoothPrinter, ReceiptData } from '@/hooks/useBluetoothPrinter';
+import { toast } from 'sonner';
 
 interface DocumentListPageProps {
   type: DocumentType;
   title: string;
 }
 
+// Company info for printing
+const COMPANY_INFO = {
+  name: 'XYZ Company Ltd. Ltd.',
+  address: '22 Macoya Road West, Macoya Industrial Estate, Tunapuna, Trinidad & Tobago',
+  phone: '+1(868)739-5025',
+};
+
 export default function DocumentListPage({ type, title }: DocumentListPageProps) {
-  const { documents, triggerPrint, deviceStatus } = usePOS();
+  const { documents, getDocument, deviceStatus } = usePOS();
+  const { printReceipt, isConnected } = useBluetoothPrinter();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<DocumentStatus | 'all'>('all');
@@ -55,6 +65,255 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
 
   const handleConvertToInvoice = (docId: string) => {
     navigate(`/invoices/new?from=${docId}`);
+  };
+
+  const handlePrint = async (docId: string) => {
+    const doc = getDocument(docId);
+    if (!doc) {
+      toast.error('Document not found');
+      return;
+    }
+
+    // If printer is connected, use Bluetooth printer
+    if (isConnected) {
+      try {
+        // Transform document to ReceiptData format
+        const receiptData: ReceiptData = {
+          companyName: COMPANY_INFO.name,
+          companyAddress: COMPANY_INFO.address,
+          companyPhone: COMPANY_INFO.phone,
+          documentType: doc.type.replace('_', ' '), // e.g., "credit_note" -> "credit note"
+          refNumber: doc.refNumber,
+          date: format(doc.date, 'dd/MM/yyyy HH:mm'),
+          customerName: doc.customer.name,
+          items: doc.items.map(item => ({
+            description: item.description,
+            quantity: item.quantity,
+            amount: item.amount,
+          })),
+          subtotal: doc.subtotal,
+          discount: doc.discount,
+          tax: doc.tax,
+          total: doc.total,
+          deposit: doc.deposit,
+          balanceDue: doc.balanceDue,
+          salesRep: doc.salesRep,
+        };
+
+        const success = await printReceipt(receiptData);
+        if (success) {
+          toast.success('Document printed successfully');
+        } else {
+          toast.error('Failed to print document. Please try again.');
+        }
+      } catch (error: any) {
+        console.error('Print error:', error);
+        toast.error(error.message || 'Failed to print document. Please try again.');
+      }
+    } else {
+      // If printer not connected, use browser print (PDF)
+      printAsPDF(doc);
+    }
+  };
+
+  const printAsPDF = (doc: any) => {
+    try {
+      // Create a new window for printing
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast.error('Please allow popups to print PDF');
+        return;
+      }
+
+      // Write HTML content with ReceiptPrintView rendered
+      printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+          <head>
+            <title>Print ${doc.refNumber}</title>
+            <style>
+              @media print {
+                @page {
+                  size: 80mm auto;
+                  margin: 0;
+                }
+                body {
+                  margin: 0;
+                  padding: 10mm;
+                  font-family: monospace;
+                  font-size: 12px;
+                }
+              }
+              body {
+                font-family: monospace;
+                font-size: 12px;
+                padding: 20px;
+                background: white;
+                color: black;
+              }
+              .text-center { text-align: center; }
+              .mb-4 { margin-bottom: 16px; }
+              .mb-2 { margin-bottom: 8px; }
+              .mt-4 { margin-top: 16px; }
+              .mt-1 { margin-top: 4px; }
+              .my-2 { margin-top: 8px; margin-bottom: 8px; }
+              .mb-1 { margin-bottom: 4px; }
+              .pl-2 { padding-left: 8px; }
+              .font-bold { font-weight: bold; }
+              .text-sm { font-size: 14px; }
+              .text-\\[10px\\] { font-size: 10px; }
+              .italic { font-style: italic; }
+              .border-t { border-top: 1px solid black; }
+              .border-dashed { border-style: dashed; }
+              .border-foreground { border-color: black; }
+              .flex { display: flex; }
+              .justify-between { justify-content: space-between; }
+              .text-right { text-align: right; }
+              .h-12 { height: 48px; }
+              .border-b { border-bottom: 1px solid black; }
+            </style>
+          </head>
+          <body>
+            <div id="root"></div>
+            <script type="module">
+              // We'll inject React component via React.createElement
+              // For now, we'll render the receipt HTML directly
+              const root = document.getElementById('root');
+              root.innerHTML = \`${generateReceiptHTML(doc)}\`;
+              
+              // Trigger print after content loads
+              setTimeout(() => {
+                window.print();
+                window.onafterprint = () => window.close();
+              }, 250);
+            </script>
+          </body>
+        </html>
+      `);
+
+      printWindow.document.close();
+    } catch (error: any) {
+      console.error('PDF print error:', error);
+      toast.error('Failed to open print dialog');
+    }
+  };
+
+  const generateReceiptHTML = (doc: any): string => {
+    // Format all dates and currency values before generating HTML
+    const formattedDate = format(doc.date, 'dd/MM/yyyy HH:mm');
+    const formattedDueDate = doc.dueDate ? format(doc.dueDate, 'dd/MM/yyyy') : '';
+    const formattedPrintDate = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
+    
+    const formatCurrency = (amount: number) => {
+      return new Intl.NumberFormat('en-TT', {
+        style: 'currency',
+        currency: 'TTD'
+      }).format(amount);
+    };
+
+    // Format all currency values
+    const formattedItems = doc.items.map((item: any, index: number) => ({
+      ...item,
+      formattedUnitPrice: formatCurrency(item.unitPrice),
+      formattedAmount: formatCurrency(item.amount),
+      index: index + 1,
+    }));
+
+    const formattedSubtotal = formatCurrency(doc.subtotal);
+    const formattedDiscount = formatCurrency(doc.discount);
+    const formattedTax = formatCurrency(doc.tax);
+    const formattedTotal = formatCurrency(doc.total);
+    const formattedDeposit = formatCurrency(doc.deposit);
+    const formattedBalanceDue = formatCurrency(doc.balanceDue);
+
+    return `
+      <div class="text-center mb-4">
+        <p class="font-bold text-sm">THE XYZ Company Ltd. LTD.</p>
+        <p>22 Macoya Road West</p>
+        <p>Macoya Industrial Estate, Tunapuna</p>
+        <p>Trinidad & Tobago</p>
+        <p>+1(868)739-5025</p>
+        <p>www.royaldatesgalore.com</p>
+      </div>
+      <div class="border-t border-dashed border-foreground my-2"></div>
+      <div class="mb-2">
+        <div class="flex justify-between">
+          <span>${doc.type.toUpperCase().replace('_', ' ')}</span>
+          <span>${doc.refNumber}</span>
+        </div>
+        <div class="flex justify-between">
+          <span>Date:</span>
+          <span>${formattedDate}</span>
+        </div>
+        ${doc.dueDate ? `<div class="flex justify-between">
+          <span>Due:</span>
+          <span>${formattedDueDate}</span>
+        </div>` : ''}
+        <div class="flex justify-between">
+          <span>Sales Rep:</span>
+          <span>${doc.salesRep}</span>
+        </div>
+      </div>
+      <div class="border-t border-dashed border-foreground my-2"></div>
+      <div class="mb-2">
+        <p class="font-bold">BILL TO:</p>
+        <p>${doc.customer.name}</p>
+        <p class="text-[10px]">${doc.customer.billingAddress}</p>
+      </div>
+      <div class="border-t border-dashed border-foreground my-2"></div>
+      <div class="mb-2">
+        ${formattedItems.map((item: any) => `
+          <div class="mb-1">
+            <p class="font-bold">${item.index}. ${item.description}</p>
+            <div class="flex justify-between pl-2">
+              <span>${item.quantity} x ${item.formattedUnitPrice}</span>
+              <span>${item.formattedAmount}</span>
+            </div>
+            ${item.discount > 0 ? `<p class="text-right text-[10px]">Disc: -${item.discount}%</p>` : ''}
+          </div>
+        `).join('')}
+      </div>
+      <div class="border-t border-dashed border-foreground my-2"></div>
+      <div class="mb-2">
+        <div class="flex justify-between">
+          <span>Subtotal:</span>
+          <span>${formattedSubtotal}</span>
+        </div>
+        ${doc.discount > 0 ? `<div class="flex justify-between">
+          <span>Discount:</span>
+          <span>-${formattedDiscount}</span>
+        </div>` : ''}
+        <div class="flex justify-between">
+          <span>Tax (12.5%):</span>
+          <span>${formattedTax}</span>
+        </div>
+        <div class="flex justify-between font-bold text-sm mt-1">
+          <span>TOTAL:</span>
+          <span>${formattedTotal}</span>
+        </div>
+        ${doc.deposit > 0 ? `<div class="flex justify-between">
+          <span>Deposit:</span>
+          <span>-${formattedDeposit}</span>
+        </div>` : ''}
+        ${doc.balanceDue > 0 ? `<div class="flex justify-between font-bold">
+          <span>Balance Due:</span>
+          <span>${formattedBalanceDue}</span>
+        </div>` : ''}
+      </div>
+      <div class="border-t border-dashed border-foreground my-2"></div>
+      ${doc.signature ? `
+        <div class="mb-2">
+          <p class="text-center text-[10px]">RECEIVED</p>
+          <div class="h-12 border-b border-foreground my-1"></div>
+          <p class="text-center text-[10px]">Date & Signature</p>
+        </div>
+      ` : ''}
+      ${doc.message ? `<p class="text-center text-[10px] italic my-2">${doc.message}</p>` : ''}
+      <div class="text-center mt-4">
+        <p class="font-bold">Thank you for your business!</p>
+        <p class="text-[10px] mt-1">Printed: ${formattedPrintDate}</p>
+      </div>
+    `;
   };
 
   return (
@@ -160,7 +419,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/${type === 'credit_note' ? 'credit-notes' : type + 's'}/${doc.id}`)}>
                           <Eye className="h-4 w-4" />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => triggerPrint(doc.id)} disabled={deviceStatus.rp4 !== 'connected'}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePrint(doc.id)}>
                           <Printer className="h-4 w-4" />
                         </Button>
                         {type === 'estimate' && (String(doc.status) === 'accepted' || doc.status === 'approved') && (
@@ -217,7 +476,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
                   <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={(e) => { e.stopPropagation(); navigate(`/${type === 'credit_note' ? 'credit-notes' : type + 's'}/${doc.id}`); }}>
                     <Eye className="h-3.5 w-3.5 mr-1" /> View
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={(e) => { e.stopPropagation(); triggerPrint(doc.id); }} disabled={deviceStatus.rp4 !== 'connected'}>
+                  <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={(e) => { e.stopPropagation(); handlePrint(doc.id); }} disabled={!isConnected}>
                     <Printer className="h-3.5 w-3.5 mr-1" /> Print
                   </Button>
                 </div>

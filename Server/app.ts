@@ -99,8 +99,6 @@ app.get('/check-auth', (req: Request, res: Response) => {
 
     // Verify and decode token
     let decoded: any;
-    console.log(token, "token");
-    console.log(JWT_SECRET, "JWT_SECRET");
     try {
       decoded = jwt.verify(token, JWT_SECRET);
     } catch (error: any) {

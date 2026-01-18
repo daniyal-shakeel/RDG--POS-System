@@ -34,6 +34,9 @@ import {
 import { DocumentType, LineItem, SalesDocument, Customer } from '@/types/pos';
 import { mockProducts, mockSalesReps, generateRefNumber } from '@/data/mockData';
 import { toast } from 'sonner';
+import { useBluetoothPrinter, ReceiptData } from '@/hooks/useBluetoothPrinter';
+import { format } from 'date-fns';
+import { printReceiptAsPDF } from '@/utils/pdfPrint';
 
 interface DocumentFormPageProps {
   type: DocumentType;
@@ -54,6 +57,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     triggerPrint,
     deviceStatus 
   } = usePOS();
+  const { printReceipt, isConnected: isPrinterConnected } = useBluetoothPrinter();
 
   const isNew = id === 'new';
   const convertFromId = searchParams.get('from');
@@ -212,7 +216,32 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     }).format(amount);
   };
 
-  const handleSave = (status: 'draft' | 'pending') => {
+  // Prepare receipt data for printing
+  const prepareReceiptData = (document: SalesDocument): ReceiptData => {
+    return {
+      companyName: 'THE XYZ Company Ltd. LTD.',
+      companyAddress: '22 Macoya Road West, Macoya Industrial Estate, Tunapuna, Trinidad & Tobago',
+      companyPhone: '+1(868)739-5025',
+      documentType: type === 'credit_note' ? 'Credit Note' : type.charAt(0).toUpperCase() + type.slice(1),
+      refNumber: document.refNumber,
+      date: format(document.date, 'dd/MM/yyyy HH:mm'),
+      customerName: document.customer.name,
+      items: document.items.map(item => ({
+        description: item.description,
+        quantity: item.quantity,
+        amount: item.amount
+      })),
+      subtotal: document.subtotal,
+      discount: document.discount,
+      tax: document.tax,
+      total: document.total,
+      deposit: document.deposit,
+      balanceDue: document.balanceDue,
+      salesRep: document.salesRep
+    };
+  };
+
+  const handleSave = async (status: 'draft' | 'pending') => {
     if (!selectedCustomer) {
       toast.error('Please select a customer');
       return;
@@ -254,6 +283,34 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     } else {
       updateDocument(id!, document);
       toast.success(`${title.replace(/s$/, '')} updated successfully`);
+    }
+
+    // Print receipt if status is 'pending'
+    if (status === 'pending') {
+      if (isPrinterConnected) {
+        // Print to physical printer if connected
+        try {
+          const receiptData = prepareReceiptData(document);
+          const printSuccess = await printReceipt(receiptData);
+          if (printSuccess) {
+            toast.success('Document saved and printed successfully');
+          } else {
+            toast.error('Document saved but printing failed. Please check printer connection.');
+            // Fallback to PDF if printer fails
+            printReceiptAsPDF(document);
+            toast.info('Opening receipt as PDF instead');
+          }
+        } catch (error) {
+          console.error('Print error:', error);
+          toast.error('Document saved but printing failed. Opening receipt as PDF instead.');
+          // Fallback to PDF if printer fails
+          printReceiptAsPDF(document);
+        }
+      } else {
+        // Print to PDF if printer is not connected
+        printReceiptAsPDF(document);
+        toast.success('Document saved. Opening receipt as PDF...');
+      }
     }
 
     navigate(`/${type === 'credit_note' ? 'credit-notes' : type + 's'}`);
