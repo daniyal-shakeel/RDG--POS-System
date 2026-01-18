@@ -76,6 +76,7 @@ export const validateString = (
     maxLength?: number;
     allowHtml?: boolean;
     checkMalicious?: boolean;
+    fieldName?: string;
   } = {}
 ): { isValid: boolean; value: string | null; error?: string } => {
   const {
@@ -84,11 +85,20 @@ export const validateString = (
     maxLength,
     allowHtml = false,
     checkMalicious = true,
+    fieldName,
   } = options;
 
   // Check if required
   if (required && (!input || (typeof input === 'string' && input.trim().length === 0))) {
-    return { isValid: false, value: null, error: 'This field is required' };
+    console.log('fieldName', fieldName);
+    console.log('input', input);
+    console.log('required', required);
+    const fieldLabel = fieldName ? fieldName.trim() : '';
+    return {
+      isValid: false,
+      value: null,
+      error: fieldLabel ? `${fieldLabel} is required` : 'This field is required',
+    };
   }
 
   // If not required and empty, return valid

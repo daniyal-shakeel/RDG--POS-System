@@ -35,7 +35,6 @@ export const authenticate = (
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    console.log(decoded, "decoded");
     req.user = {
       userId: decoded.userId || decoded.email, // Support both formats
       email: decoded.email,
@@ -68,6 +67,8 @@ export const authorize = (...allowedRoles: string[]) => {
       return;
     }
 
+    console.log(req.user.role);
+    console.log(allowedRoles);
     if (!allowedRoles.includes(req.user.role)) {
       res.status(403).json({
         message: `Access denied. Required role: ${allowedRoles.join(" or ")}`,

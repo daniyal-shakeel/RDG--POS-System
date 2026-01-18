@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { SalesDocument, User, DeviceStatus, Customer, UserRole } from '@/types/pos';
-import { mockDocuments, mockUser, mockCustomers } from '@/data/mockData';
+import { mockDocuments } from '@/data/mockData';
 import { api } from '@/services/api';
 
 interface POSContextType {
@@ -29,12 +29,12 @@ const USER_KEY = 'user';
 // Helper function to map backend role to frontend UserRole
 const mapRoleToUserRole = (role: string): UserRole => {
   const roleMap: Record<string, UserRole> = {
-    'Super Admin': 'admin',
+    'Super Admin': 'super_admin',
     'Admin': 'admin',
-    'Manager': 'manager',
-    'Sales Rep': 'sales_rep',
     'Sales Representative': 'sales_rep',
-    'Warehouse': 'warehouse',
+    'Sales Rep': 'sales_rep',
+    'Stock-Keeper': 'stock_keeper',
+    'Stock Keeper': 'stock_keeper',
   };
   
   // Normalize role name (remove underscores, handle variations)
@@ -48,7 +48,14 @@ export function POSProvider({ children }: { children: ReactNode }) {
     const savedUser = localStorage.getItem(USER_KEY);
     if (savedUser) {
       try {
-        return JSON.parse(savedUser);
+        const parsedUser = JSON.parse(savedUser);
+        // Only Super Admin should have "*" permission
+        // Check by originalRole (backend role name) or if permissions already include "*"
+        if (parsedUser.originalRole === 'Super Admin' || parsedUser.permissions?.includes('*')) {
+          parsedUser.permissions = ['*'];
+        }
+        // Otherwise, use the permissions from backend (don't override)
+        return parsedUser;
       } catch {
         return null;
       }
@@ -57,7 +64,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
   });
   
   const [documents, setDocuments] = useState<SalesDocument[]>(mockDocuments);
-  const [customers] = useState<Customer[]>(mockCustomers);
+  const [customers] = useState<Customer[]>([]);
   const [deviceStatus, setDeviceStatusState] = useState<DeviceStatus>({
     ct60: 'connected',
     rp4: 'connected'
@@ -80,12 +87,18 @@ export function POSProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(TOKEN_KEY, token);
 
       // Map backend user data to frontend User type
+      const mappedRole = mapRoleToUserRole(userData.role || 'sales_rep');
+      // Only Super Admin gets "*" permission - check by exact role name from backend
+      const isSuperAdmin = userData.role === 'Super Admin';
       const mappedUser: User = {
         id: userData.id || userData._id || '',
         name: userData.fullName || userData.name || userData.email || '',
         email: userData.email || '',
-        role: mapRoleToUserRole(userData.role || 'sales_rep'),
+        role: mappedRole,
         avatar: userData.avatar,
+        originalRole: userData.role, // Store original backend role for display
+        // Only Super Admin gets "*" permission, others use permissions from backend
+        permissions: isSuperAdmin ? ['*'] : (userData.permissions || []),
       };
 
       // Store user data

@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowLeft, Save, User, Mail, Phone, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/services/api';
+import axios from 'axios';
 
 const addressSchema = z.object({
   street: z.string().min(1, 'Street is required').max(255),

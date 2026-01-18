@@ -29,6 +29,7 @@ import { useState, useEffect } from 'react';
 import { api } from '@/services/api';
 import { toast } from 'sonner';
 import { usePOS } from '@/contexts/POSContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -91,9 +92,10 @@ export default function UsersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Check if current user is Super Admin (has "*" permission)
+  // Check if current user can manage users (has user.manage permission or is Super Admin)
+  const { hasPermission } = usePermissions();
+  const canManageUsers = hasPermission('user.manage');
   const isSuperAdmin = user?.permissions?.includes('*') || false;
-
   const form = useForm<UserFormData>({
     resolver: zodResolver(userSchema),
     defaultValues: {

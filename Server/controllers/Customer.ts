@@ -4,6 +4,22 @@ import Customer, { IAddress } from "../models/Customer";
 import { validateName, validateEmail, validatePhone, validateAddress } from "../utils/validation";
 import { AuthRequest } from "../middleware/auth";
 import { hasPermission } from "../middleware/permissions";
+import { getRedisClient } from "../config/redis";
+
+const CUSTOMER_LIST_CACHE_KEY = "customers:all";
+const CUSTOMER_CACHE_PREFIX = "customers:";
+const CUSTOMER_CACHE_TTL_SECONDS = 300;
+
+const runCacheOps = async (ops: Promise<unknown>[]) => {
+  if (!ops.length) {
+    return;
+  }
+  try {
+    await Promise.all(ops);
+  } catch (error) {
+    console.error("Redis cache error:", error);
+  }
+};
 
 type CreateCustomerBody = {
   name: string;
@@ -135,6 +151,15 @@ const createCustomer = async (req: AuthRequest, res: Response) => {
       status: body.status || "active",
     });
 
+    const cacheClient = await getRedisClient();
+    if (cacheClient) {
+      const customerKey = `${CUSTOMER_CACHE_PREFIX}${newCustomer._id.toString()}`;
+      await runCacheOps([
+        cacheClient.setEx(customerKey, CUSTOMER_CACHE_TTL_SECONDS, JSON.stringify(newCustomer)),
+        cacheClient.del(CUSTOMER_LIST_CACHE_KEY),
+      ]);
+    }
+
     return res
       .status(201)
       .json({ message: "Customer created successfully", customer: newCustomer });
@@ -161,13 +186,38 @@ const getCustomers = async (req: AuthRequest, res: Response) => {
     }
 
     const userPermissions = req.user.permissions || [];
-    if (!hasPermission(userPermissions, "customer.read")) {
+    if (!hasPermission(userPermissions, "customer.view")) {
       return res.status(403).json({
-        message: "Access denied. Required permission: customer.read",
+        message: "Access denied. Required permission: customer.view",
       });
     }
 
+    const cacheClient = await getRedisClient();
+    if (cacheClient) {
+      try {
+        const cachedCustomers = await cacheClient.get(CUSTOMER_LIST_CACHE_KEY);
+        if (cachedCustomers) {
+          return res.status(200).json({
+            message: "Customers fetched successfully",
+            customers: JSON.parse(cachedCustomers),
+          });
+        }
+      } catch (error) {
+        console.error("Redis cache read error:", error);
+      }
+    }
+
     const customers = await Customer.find({}).sort({ createdAt: -1 });
+
+    if (cacheClient) {
+      await runCacheOps([
+        cacheClient.setEx(
+          CUSTOMER_LIST_CACHE_KEY,
+          CUSTOMER_CACHE_TTL_SECONDS,
+          JSON.stringify(customers)
+        ),
+      ]);
+    }
 
     return res
       .status(200)
@@ -188,9 +238,9 @@ const getCustomerById = async (req: AuthRequest, res: Response) => {
     }
 
     const userPermissions = req.user.permissions || [];
-    if (!hasPermission(userPermissions, "customer.read")) {
+    if (!hasPermission(userPermissions, "customer.view")) {
       return res.status(403).json({
-        message: "Access denied. Required permission: customer.read",
+        message: "Access denied. Required permission: customer.view",
       });
     }
 
@@ -199,12 +249,38 @@ const getCustomerById = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: "Invalid customer id" });
     }
 
+    const cacheClient = await getRedisClient();
+    const customerCacheKey = `${CUSTOMER_CACHE_PREFIX}${id}`;
+    if (cacheClient) {
+      try {
+        const cachedCustomer = await cacheClient.get(customerCacheKey);
+        if (cachedCustomer) {
+          return res.status(200).json({
+            message: "Customer fetched successfully",
+            customer: JSON.parse(cachedCustomer),
+          });
+        }
+      } catch (error) {
+        console.error("Redis cache read error:", error);
+      }
+    }
+
     const customer = await Customer.findOne({
       _id: new Types.ObjectId(id),
     });
 
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
+    }
+
+    if (cacheClient) {
+      await runCacheOps([
+        cacheClient.setEx(
+          customerCacheKey,
+          CUSTOMER_CACHE_TTL_SECONDS,
+          JSON.stringify(customer)
+        ),
+      ]);
     }
 
     return res
@@ -271,6 +347,15 @@ const updateCustomer = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
+    const cacheClient = await getRedisClient();
+    if (cacheClient) {
+      const customerKey = `${CUSTOMER_CACHE_PREFIX}${id}`;
+      await runCacheOps([
+        cacheClient.setEx(customerKey, CUSTOMER_CACHE_TTL_SECONDS, JSON.stringify(customer)),
+        cacheClient.del(CUSTOMER_LIST_CACHE_KEY),
+      ]);
+    }
+
     return res
       .status(200)
       .json({ message: "Customer updated successfully", customer });
@@ -307,6 +392,15 @@ const deleteCustomer = async (req: AuthRequest, res: Response) => {
 
     if (!customer) {
       return res.status(404).json({ message: "Customer not found" });
+    }
+
+    const cacheClient = await getRedisClient();
+    if (cacheClient) {
+      const customerKey = `${CUSTOMER_CACHE_PREFIX}${id}`;
+      await runCacheOps([
+        cacheClient.del(customerKey),
+        cacheClient.del(CUSTOMER_LIST_CACHE_KEY),
+      ]);
     }
 
     return res

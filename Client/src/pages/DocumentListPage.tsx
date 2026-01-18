@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { usePOS } from '@/contexts/POSContext';
+import api from '@/services/api';
 import { StatusBadge } from '@/components/common/StatusBadge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -40,13 +41,65 @@ const COMPANY_INFO = {
 };
 
 export default function DocumentListPage({ type, title }: DocumentListPageProps) {
-  const { documents, getDocument, deviceStatus } = usePOS();
+  const { documents, getDocument, deviceStatus, user } = usePOS();
   const { printReceipt, isConnected } = useBluetoothPrinter();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<DocumentStatus | 'all'>('all');
+  const isStockKeeper = user?.role === 'stock_keeper';
+  const [apiDocuments, setApiDocuments] = useState<any[]>([]);
+  const [hasFetchedEstimates, setHasFetchedEstimates] = useState(false);
+  const [isLoadingEstimates, setIsLoadingEstimates] = useState(false);
 
-  const filteredDocuments = documents
+  useEffect(() => {
+    const fetchEstimates = async () => {
+      if (type !== 'estimate') {
+        return;
+      }
+      setIsLoadingEstimates(true);
+      try {
+        const response = await api.get('/api/v1/estimate');
+        const incoming = Array.isArray(response.data?.estimates)
+          ? response.data.estimates
+          : [];
+        const mapped = incoming.map((estimate: any) => ({
+          id: estimate.reference,
+          refNumber: estimate.reference,
+          type: 'estimate',
+          date: estimate.createdAt ? new Date(estimate.createdAt) : new Date(),
+          dueDate: undefined,
+          status: estimate.status || 'draft',
+          customer: {
+            name: estimate.customerName || '',
+            email: estimate.customerEmail || '',
+          },
+          items: [],
+          subtotal: estimate.total || 0,
+          discount: 0,
+          tax: 0,
+          total: estimate.total || 0,
+          balanceDue: estimate.total || 0,
+          deposit: 0,
+          salesRep: estimate.salesRep || '',
+        }));
+        setApiDocuments(mapped);
+      } catch (error) {
+        console.error('Estimate fetch error:', error);
+        toast.error('Unable to load estimates');
+        setApiDocuments([]);
+      } finally {
+        setHasFetchedEstimates(true);
+        setIsLoadingEstimates(false);
+      }
+    };
+
+    fetchEstimates();
+  }, [type]);
+
+  const baseDocuments =
+    type === 'estimate' && hasFetchedEstimates ? apiDocuments : documents;
+
+  const filteredDocuments = baseDocuments
     .filter(doc => doc.type === type)
     .filter(doc => 
       statusFilter === 'all' || doc.status === statusFilter
@@ -67,8 +120,40 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
     navigate(`/invoices/new?from=${docId}`);
   };
 
+  const handleViewDocument = async (doc: any) => {
+    if (doc.type !== 'estimate') {
+      navigate(`/${type === 'credit_note' ? 'credit-notes' : type + 's'}/${doc.id}`);
+      return;
+    }
+  
+    try {
+      const token = localStorage.getItem('token') || '';
+      const response = await api.get(`/api/v1/estimate/${doc.refNumber}`, {
+        params: {
+          token,
+          id: doc.refNumber,
+        },
+      });
+      navigate(`/estimates/${doc.id}`, {
+        state: {
+          estimate: response.data?.estimate,
+        },
+      });
+    } catch (error) {
+      console.error('Estimate fetch error:', error);
+      toast.error('Unable to load estimate');
+    }
+  };
+
+  const getDocumentById = (docId: string) => {
+    if (type === 'estimate' && hasFetchedEstimates) {
+      return baseDocuments.find((doc: any) => doc.id === docId);
+    }
+    return getDocument(docId);
+  };
+
   const handlePrint = async (docId: string) => {
-    const doc = getDocument(docId);
+    const doc = getDocumentById(docId);
     if (!doc) {
       toast.error('Document not found');
       return;
@@ -327,10 +412,17 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
               Manage your {title.toLowerCase()}
             </p>
           </div>
-          <Button onClick={() => navigate(`/${type === 'credit_note' ? 'credit-notes' : type + 's'}/new`)} className="gap-2 text-xs sm:text-sm w-full sm:w-auto">
-            <Plus className="h-4 w-4" />
-            New {title.replace(/s$/, '')}
-          </Button>
+          {!isStockKeeper && (
+            <Button
+              onClick={() =>
+                navigate(`/${type === 'credit_note' ? 'credit-notes' : type + 's'}/new`)
+              }
+              className="gap-2 text-xs sm:text-sm w-full sm:w-auto"
+            >
+              <Plus className="h-4 w-4" />
+              New {title.replace(/s$/, '')}
+            </Button>
+          )}
         </div>
 
         {/* Filters */}
@@ -416,7 +508,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => navigate(`/${type === 'credit_note' ? 'credit-notes' : type + 's'}/${doc.id}`)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleViewDocument(doc)}>
                           <Eye className="h-4 w-4" />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handlePrint(doc.id)}>
@@ -444,7 +536,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
             </div>
           ) : (
             filteredDocuments.map((doc) => (
-              <div key={doc.id} className="glass-card rounded-xl p-4" onClick={() => navigate(`/${type === 'credit_note' ? 'credit-notes' : type + 's'}/${doc.id}`)}>
+              <div key={doc.id} className="glass-card rounded-xl p-4" >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="font-mono font-medium text-sm">{doc.refNumber}</p>

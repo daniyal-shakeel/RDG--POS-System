@@ -14,6 +14,7 @@ import connectDB from './config/db';
 import customerRouter from './routes/Customer';
 import authRouter from './routes/Auth';
 import userRouter from './routes/User';
+import estimateRouter from './routes/Estimate';
 
 
 const app = express();
@@ -24,7 +25,7 @@ const PORT = 5500;
 
 export const SUPER_ADMIN_EMAIL: string = process.env.SUPER_ADMIN_EMAIL || '';
 export const SUPER_ADMIN_PASSWORD: string = process.env.SUPER_ADMIN_PASSWORD || '';
-export const JWT_SECRET: string = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+export const JWT_SECRET: string = process.env.JWT_SECRET || "";
 export const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || "7d";
 
 if(!JWT_SECRET || !JWT_EXPIRES_IN) {
@@ -204,6 +205,7 @@ app.use((err: Error, _req: Request, res: Response, _next: Function): void => {
 app.use('/api/v1/user', userRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/customer', customerRouter);
+app.use('/api/v1/estimate', estimateRouter);
 
 // 404 handler
 app.use((_req: Request, res: Response): void => {

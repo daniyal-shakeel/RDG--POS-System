@@ -1,6 +1,6 @@
 export type DocumentType = 'invoice' | 'receipt' | 'credit_note' | 'refund' | 'estimate';
 export type DocumentStatus = 'draft' | 'pending' | 'approved' | 'paid' | 'partial' | 'overdue' | 'cancelled' | 'converted';
-export type UserRole = 'admin' | 'manager' | 'sales_rep' | 'warehouse';
+export type UserRole = 'super_admin' | 'admin' | 'sales_rep' | 'stock_keeper';
 
 export interface LineItem {
   id: string;
@@ -52,6 +52,7 @@ export interface User {
   role: UserRole;
   avatar?: string;
   permissions?: string[];
+  originalRole?: string; // Store original backend role name for display
 }
 
 export interface DeviceStatus {

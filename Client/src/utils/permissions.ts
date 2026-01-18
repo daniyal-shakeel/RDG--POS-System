@@ -1,8 +1,30 @@
 /**
+ * Maps old permission format to new format for backward compatibility
+ * customer.read -> customer.view
+ * invoice.read -> invoice.view
+ * credit_note -> creditNote
+ * etc.
+ */
+const mapLegacyPermission = (permission: string): string => {
+  // Map .read to .view for backward compatibility
+  if (permission.endsWith('.read')) {
+    return permission.replace('.read', '.view');
+  }
+  // Map credit_note to creditNote
+  if (permission.includes('credit_note')) {
+    return permission.replace('credit_note', 'creditNote');
+  }
+  return permission;
+};
+
+/**
  * Checks if user has a specific permission
- * Supports wildcard permissions (e.g., "customer.*" matches "customer.create")
+ * Supports:
+ * - Wildcard permissions (e.g., "customer.*" matches "customer.create")
+ * - Super admin with "*"
+ * - Legacy format mapping (.read -> .view)
  * @param userPermissions - Array of user permissions
- * @param requiredPermission - Required permission (e.g., "customer.create")
+ * @param requiredPermission - Required permission (e.g., "customer.view" or "customer.create")
  * @returns true if user has the permission
  */
 export const hasPermission = (
@@ -13,13 +35,19 @@ export const hasPermission = (
     return false;
   }
 
-  // Super Admin has all permissions
+  // Super Admin has all permissions - always return true
   if (userPermissions.includes('*')) {
     return true;
   }
 
   // Exact match
   if (userPermissions.includes(requiredPermission)) {
+    return true;
+  }
+
+  // Check legacy format mapping (e.g., customer.read -> customer.view)
+  const mappedPermission = mapLegacyPermission(requiredPermission);
+  if (mappedPermission !== requiredPermission && userPermissions.includes(mappedPermission)) {
     return true;
   }
 

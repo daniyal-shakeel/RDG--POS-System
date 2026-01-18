@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -17,8 +18,8 @@ import {
   UserCog
 } from 'lucide-react';
 import { usePOS } from '@/contexts/POSContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 const navItemsConfig = [
   { 
@@ -26,67 +27,68 @@ const navItemsConfig = [
     label: 'Dashboard', 
     icon: LayoutDashboard,
     permissions: [
-      'invoice.read', 'invoice.*',
-      'receipt.read', 'receipt.*',
-      'customer.read', 'customer.*',
-      'credit_note.read', 'credit_note.*',
-      'refund.read', 'refund.*',
-      'estimate.read', 'estimate.*'
+      'dashboard.view',
+      'invoice.view', 'invoice.*',
+      'receipt.view', 'receipt.*',
+      'customer.view', 'customer.*',
+      'creditNote.view', 'creditNote.*',
+      'refund.view', 'refund.*',
+      'estimate.view', 'estimate.*'
     ] // Dashboard visible if user has access to documents/customers (not just inventory)
   },
   { 
     path: '/invoices', 
     label: 'Invoices', 
     icon: FileText,
-    permissions: ['invoice.read', 'invoice.*']
+    permissions: ['invoice.view', 'invoice.*']
   },
   { 
     path: '/receipts', 
     label: 'Receipts', 
     icon: Receipt,
-    permissions: ['receipt.read', 'receipt.*']
+    permissions: ['receipt.view', 'receipt.*']
   },
   { 
     path: '/credit-notes', 
     label: 'Credit Notes', 
     icon: CreditCard,
-    permissions: ['credit_note.read', 'credit_note.*']
+    permissions: ['creditNote.view', 'creditNote.*']
   },
   { 
     path: '/refunds', 
     label: 'Refunds', 
     icon: RotateCcw,
-    permissions: ['refund.read', 'refund.*']
+    permissions: ['refund.view', 'refund.*']
   },
   { 
     path: '/estimates', 
     label: 'Estimates', 
     icon: FileCheck,
-    permissions: ['estimate.read', 'estimate.*']
+    permissions: ['estimate.view', 'estimate.*']
   },
   { 
     path: '/customers', 
     label: 'Customers', 
     icon: Users,
-    permissions: ['customer.read', 'customer.*']
+    permissions: ['customer.view', 'customer.*']
   },
   { 
     path: '/users', 
     label: 'Users', 
     icon: UserCog,
-    permissions: ['user.read']
+    permissions: ['user.manage']
   },
   { 
     path: '/inventory', 
     label: 'Inventory', 
     icon: Package,
-    permissions: ['inventory.read', 'inventory.*', 'product.read', 'product.*']
+    permissions: ['inventory.view', 'inventory.*', 'product.view', 'product.*']
   },
   { 
     path: '/settings', 
     label: 'Settings', 
     icon: Settings,
-    permissions: [] // Empty array means visible to all authenticated users
+    permissions: ['settings.view'] // Settings visible to users with settings.view permission
   }
 ];
 
@@ -99,19 +101,40 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, deviceStatus } = usePOS();
-  const { hasPermission, hasAnyPermission } = usePermissions();
+  const { hasAnyPermission } = usePermissions();
+
+  const handleLogout = () => {
+    // Navigate immediately for instant redirect
+    navigate('/login', { replace: true });
+    // Clear state in background (don't wait for API call)
+    logout().catch(() => {
+      // Ignore errors - we've already navigated away
+    });
+  };
 
   // Filter navigation items based on permissions
   const navItems = useMemo(() => {
+    if (!user) {
+      return [];
+    }
+
     const userPermissions = user?.permissions || [];
-    const isSuperAdmin = userPermissions.includes('*');
+    const userRole = user?.role;
+    const originalRole = user?.originalRole;
     
+    // Super Admin: Only check by "*" permission or originalRole === 'Super Admin'
+    // Give super admin access to everything - no permission checks
+    const isSuperAdmin = 
+      userPermissions.includes('*') || 
+      originalRole === 'Super Admin';
+    
+    // Super Admin sees ALL items - no permission checks
+    if (isSuperAdmin) {
+      return navItemsConfig;
+    }
+    
+    // For other users, check permissions
     return navItemsConfig.filter(item => {
-      // Special handling for Super Admin only items
-      if ((item as any).isSuperAdminOnly) {
-        return isSuperAdmin;
-      }
-      
       // If no permissions required, show to all authenticated users
       if (!item.permissions || item.permissions.length === 0) {
         return true;
@@ -120,29 +143,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
       // Check if user has any of the required permissions
       return hasAnyPermission(item.permissions);
     });
-  }, [hasAnyPermission, user?.permissions]);
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      toast.success('Logged out successfully');
-      navigate('/login');
-    } catch (error: any) {
-      // Error is handled in logout function, but we still navigate
-      navigate('/login');
-    }
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      toast.success('Logged out successfully');
-      navigate('/login');
-    } catch (error: any) {
-      // Error is handled in logout function, but we still navigate
-      navigate('/login');
-    }
-  };
+  }, [hasAnyPermission, user]);
 
   return (
     <aside className={cn(
@@ -243,12 +244,22 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
             <div className="flex-1 min-w-0">
               <p className="text-xs xl:text-sm font-medium truncate">{user?.name || 'Guest'}</p>
               <p className="text-[10px] xl:text-xs text-muted-foreground capitalize">
-                {user?.role?.replace('_', ' ') || 'Not logged in'}
+                {user?.originalRole || (() => {
+                  if (!user?.role) return 'Not logged in';
+                  // Map frontend role back to display name if originalRole not available
+                  const roleDisplayMap: Record<string, string> = {
+                    'super_admin': 'Super Admin',
+                    'admin': 'Admin',
+                    'sales_rep': 'Sales Representative',
+                    'stock_keeper': 'Stock Keeper',
+                  };
+                  return roleDisplayMap[user.role] || user.role.replace('_', ' ');
+                })()}
               </p>
             </div>
           </div>
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="flex items-center gap-2 w-full px-3 xl:px-4 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
           >
             <LogOut className="h-3.5 w-3.5 xl:h-4 xl:w-4" />

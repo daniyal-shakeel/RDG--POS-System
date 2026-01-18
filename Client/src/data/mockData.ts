@@ -133,26 +133,6 @@ export const mockDocuments: SalesDocument[] = [
     const items = generateMockLineItems();
     const totals = calculateTotals(items);
     return {
-      id: 'DOC003',
-      type: 'estimate' as const,
-      refNumber: 'EST-2025-0003',
-      date: new Date('2025-01-13'),
-      customer: mockCustomers[2],
-      items,
-      ...totals,
-      balanceDue: totals.total,
-      deposit: 0,
-      status: 'pending' as const,
-      salesRep: 'David Singh',
-      message: 'Valid for 30 days',
-      createdAt: new Date('2025-01-13T09:15:00'),
-      updatedAt: new Date('2025-01-13T09:15:00')
-    };
-  })(),
-  (() => {
-    const items = generateMockLineItems();
-    const totals = calculateTotals(items);
-    return {
       id: 'DOC004',
       type: 'credit_note' as const,
       refNumber: 'CN-2025-0001',

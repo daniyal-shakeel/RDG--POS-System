@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import api from '@/services/api';
+import { useParams, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { usePOS } from '@/contexts/POSContext';
 import { SignaturePad } from '@/components/common/SignaturePad';
@@ -22,21 +23,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { 
-  Save, 
-  Printer, 
-  Send, 
-  Trash2, 
-  Plus, 
+import {
+  Save,
+  Trash2,
+  Plus,
   QrCode,
   ArrowLeft
 } from 'lucide-react';
 import { DocumentType, LineItem, SalesDocument, Customer } from '@/types/pos';
-import { mockProducts, mockSalesReps, generateRefNumber } from '@/data/mockData';
+import { mockProducts, generateRefNumber } from '@/data/mockData';
 import { toast } from 'sonner';
 import { useBluetoothPrinter, ReceiptData } from '@/hooks/useBluetoothPrinter';
 import { format } from 'date-fns';
-import { printReceiptAsPDF } from '@/utils/pdfPrint';
 
 interface DocumentFormPageProps {
   type: DocumentType;
@@ -47,14 +45,12 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { 
-    customers, 
     addDocument, 
     updateDocument, 
     getDocument, 
-    user, 
     triggerScan,
-    triggerPrint,
     deviceStatus 
   } = usePOS();
   const { printReceipt, isConnected: isPrinterConnected } = useBluetoothPrinter();
@@ -63,14 +59,110 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
   const convertFromId = searchParams.get('from');
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
+  const [apiCustomers, setApiCustomers] = useState<Customer[]>([]);
+  const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
+  const [customersError, setCustomersError] = useState<string | null>(null);
+  const [hasFetchedCustomers, setHasFetchedCustomers] = useState(false);
+  const customersAbortRef = useRef<AbortController | null>(null);
   const [items, setItems] = useState<LineItem[]>([]);
   const [terms, setTerms] = useState('Net 15');
   const [message, setMessage] = useState('');
-  const [salesRep, setSalesRep] = useState(user?.name || mockSalesReps[0]);
+  const [salesRep, setSalesRep] = useState('');
+  const [selectedSalesRepName, setSelectedSalesRepName] = useState('');
+  const [salesReps, setSalesReps] = useState<{ id: string; name: string }[]>([]);
+  const [isLoadingSalesReps, setIsLoadingSalesReps] = useState(false);
+  const [salesRepsError, setSalesRepsError] = useState<string | null>(null);
+  const [hasFetchedSalesReps, setHasFetchedSalesReps] = useState(false);
+  const salesRepsAbortRef = useRef<AbortController | null>(null);
   // Signature stored as base64 string (without data URL prefix) - ready for API transmission
   const [signature, setSignature] = useState<string | undefined>();
   const [deposit, setDeposit] = useState(0);
-  const [refNumber] = useState(generateRefNumber(type));
+  const [refNumber, setRefNumber] = useState(
+    type === 'estimate' ? '' : generateRefNumber(type)
+  );
+
+  const effectiveCustomers = apiCustomers;
+    const getCustomerId = (customer: Customer, index?: number) =>
+      customer.id ||
+      (customer as any)._id ||
+      (typeof index === 'number' ? `customer-${index}` : undefined);
+  const formatAddress = (address: unknown): string => {
+    if (!address) {
+      return '';
+    }
+    if (typeof address === 'string') {
+      return address;
+    }
+    if (typeof address === 'object') {
+      const addr = address as {
+        street?: string;
+        city?: string;
+        state?: string;
+        postalCode?: string;
+        country?: string;
+      };
+      const parts = [
+        addr.street,
+        addr.city,
+        addr.state,
+        addr.postalCode,
+        addr.country,
+      ].filter((part) => typeof part === 'string' && part.trim().length > 0);
+      if (parts.length) {
+        return parts.join(', ');
+      }
+    }
+    return String(address);
+  };
+
+  const applyEstimateToForm = (estimateState: any) => {
+    if (!estimateState) {
+      return;
+    }
+    if (estimateState.reference && estimateState.reference !== id) {
+      return;
+    }
+    const customer = estimateState.customer || {};
+    const mappedCustomer: Customer = {
+      id: customer.id || customer._id || '',
+      name: customer.name || '',
+      email: customer.email || '',
+      phone: customer.phone || '',
+      billingAddress: formatAddress(customer.billingAddress),
+      shippingAddress: formatAddress(customer.shippingAddress),
+    };
+    const salesRepValue = estimateState.salesRepId || estimateState.salesRep || '';
+    setSelectedCustomer(mappedCustomer);
+    setItems(mapEstimateItems(Array.isArray(estimateState.items) ? estimateState.items : []));
+    setMessage(estimateState.message || '');
+    setSignature(normalizeSignature(estimateState.signature));
+    setSalesRep(salesRepValue);
+    setSelectedSalesRepName(estimateState.salesRep || '');
+    setRefNumber(estimateState.reference || '');
+    setDeposit(0);
+  };
+
+  const mapEstimateItems = (incoming: any[]): LineItem[] => {
+    return incoming.map((item, index) => {
+      const quantity = Number(item?.quantity ?? 0);
+      const discount = Number(item?.discount ?? 0);
+      const amount = Number(item?.amount ?? 0);
+      const discountFactor = 1 - discount / 100;
+      const unitPrice =
+        quantity > 0 && discountFactor > 0 ? amount / quantity / discountFactor : 0;
+      return {
+        id: item?.id || `estimate-item-${index}`,
+        productCode: item?.productCode || '',
+        description: item?.description || '',
+        quantity: Number.isFinite(quantity) ? quantity : 0,
+        unitPrice: Number.isFinite(unitPrice) ? unitPrice : 0,
+        discount: Number.isFinite(discount) ? discount : 0,
+        amount: Number.isFinite(amount)
+          ? amount
+          : Number((quantity * unitPrice * discountFactor).toFixed(2)),
+      };
+    });
+  };
 
   // Helper to normalize signature format - extract base64 from data URL if needed
   // This ensures signatures are stored as plain base64 strings for API transmission
@@ -85,6 +177,9 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
   // Load existing document if editing
   useEffect(() => {
     if (!isNew && id) {
+      if (type === 'estimate') {
+        return;
+      }
       const doc = getDocument(id);
       if (doc) {
         setSelectedCustomer(doc.customer);
@@ -107,6 +202,150 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       }
     }
   }, [id, isNew, convertFromId, getDocument]);
+
+  useEffect(() => {
+    if (type !== 'estimate' || !id || id === 'new') {
+      return;
+    }
+    const estimateState = (location.state as any)?.estimate;
+    if (!estimateState) {
+      return;
+    }
+    applyEstimateToForm(estimateState);
+  }, [type, id, location.state]);
+
+  useEffect(() => {
+    const fetchEstimate = async () => {
+      if (type !== 'estimate' || !id || id === 'new') {
+        return;
+      }
+      const estimateState = (location.state as any)?.estimate;
+      if (estimateState) {
+        return;
+      }
+      try {
+        const token = localStorage.getItem('token') || '';
+        const response = await api.get(`/api/v1/estimate/${id}`, {
+          params: {
+            token,
+            id,
+          },
+        });
+        applyEstimateToForm(response.data?.estimate);
+      } catch (error) {
+        console.error('Estimate fetch error:', error);
+        toast.error('Unable to load estimate');
+      }
+    };
+
+    fetchEstimate();
+  }, [type, id, location.state]);
+
+  useEffect(() => {
+    if (type !== 'estimate') {
+      return;
+    }
+    if (selectedCustomer && !hasFetchedCustomers) {
+      loadCustomers();
+    }
+    if (salesRep && !hasFetchedSalesReps) {
+      loadSalesReps();
+    }
+  }, [type, selectedCustomer, salesRep, hasFetchedCustomers, hasFetchedSalesReps]);
+
+  const loadCustomers = async () => {
+    if (isLoadingCustomers || hasFetchedCustomers) {
+      return;
+    }
+    setIsLoadingCustomers(true);
+    setCustomersError(null);
+    const controller = new AbortController();
+    customersAbortRef.current = controller;
+    try {
+      const response = await api.get('/api/v1/customer', {
+        signal: controller.signal,
+      });
+      const data = response.data;
+      const incoming = Array.isArray(data?.customers) ? data.customers : [];
+      setApiCustomers(incoming);
+      setHasFetchedCustomers(true);
+      if (incoming.length === 0) {
+        setCustomersError('No customers found');
+      }
+    } catch (error: any) {
+      if (error?.name !== 'AbortError' && error?.code !== 'ERR_CANCELED') {
+        console.error('Customer fetch error:', error);
+        setCustomersError('Unable to load customers');
+        setApiCustomers([]);
+      }
+    } finally {
+      setIsLoadingCustomers(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => customersAbortRef.current?.abort();
+  }, []);
+
+  const loadSalesReps = async () => {
+    if (isLoadingSalesReps || hasFetchedSalesReps) {
+      return;
+    }
+    setIsLoadingSalesReps(true);
+    setSalesRepsError(null);
+    const controller = new AbortController();
+    salesRepsAbortRef.current = controller;
+    try {
+      const response = await api.get('/api/v1/user', {
+        params: { role: 'Sales Representative' },
+        signal: controller.signal,
+      });
+      const data = response.data;
+      const incoming = Array.isArray(data?.users) ? data.users : [];
+      const mapped = incoming
+        .map((rep: any, index: number) => ({
+          id:
+            rep.id ||
+            rep._id ||
+            rep.email ||
+            `sales-rep-${index}`,
+          name: rep.fullName || rep.name || rep.email || 'Unnamed Sales Rep',
+        }))
+        .filter((rep: any) => rep.name);
+      setSalesReps(mapped);
+      const hasSelectedId = mapped.some((rep: any) => rep.id === salesRep);
+      const matchByName = mapped.find(
+        (rep: any) => rep.name.toLowerCase() === salesRep.toLowerCase()
+      );
+      const nextSelection =
+        hasSelectedId
+          ? salesRep
+          : matchByName?.id || (mapped.length > 0 ? mapped[0].id : '');
+      if (nextSelection && nextSelection !== salesRep) {
+        setSalesRep(nextSelection);
+      }
+      const selectedRep = mapped.find((rep) => rep.id === nextSelection);
+      if (selectedRep?.name) {
+        setSelectedSalesRepName(selectedRep.name);
+      }
+      setHasFetchedSalesReps(true);
+      if (mapped.length === 0) {
+        setSalesRepsError('No sales representatives found');
+      }
+    } catch (error: any) {
+      if (error?.name !== 'AbortError' && error?.code !== 'ERR_CANCELED') {
+        console.error('Sales rep fetch error:', error);
+        setSalesRepsError('Unable to load sales representatives');
+        setSalesReps([]);
+      }
+    } finally {
+      setIsLoadingSalesReps(false);
+    }
+  };
+
+  useEffect(() => {
+    return () => salesRepsAbortRef.current?.abort();
+  }, []);
 
   const addItem = () => {
     const newItem: LineItem = {
@@ -246,6 +485,11 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       toast.error('Please select a customer');
       return;
     }
+    const selectedSalesRep = salesReps.find((rep) => rep.id === salesRep);
+    if (!selectedSalesRep?.id) {
+      toast.error('Please select a sales representative');
+      return;
+    }
     if (items.length === 0) {
       toast.error('Please add at least one item');
       return;
@@ -267,7 +511,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       balanceDue,
       deposit,
       status,
-      salesRep,
+      salesRep: selectedSalesRep?.name || '',
       // Signature is stored as base64 string (without data URL prefix) - ready for API transmission
       // Backend can reconstruct data URL if needed: `data:image/png;base64,${signature}`
       signature,
@@ -276,6 +520,84 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       updatedAt: new Date(),
       convertedFrom: convertFromId || undefined
     };
+
+    if (type === 'estimate') {
+      const customerId = getCustomerId(document.customer);
+      const salesRepId = selectedSalesRep?.id?.trim();
+      const hasValidItems = document.items.some(
+        (item) =>
+          item.productCode?.trim() &&
+          item.description?.trim() &&
+          typeof item.quantity === 'number' &&
+          item.quantity > 0
+      );
+      const messageText = document.message?.trim();
+      const signatureBase64 = document.signature?.trim();
+
+      if (!customerId) {
+        toast.error('Customer is required for estimates');
+        return;
+      }
+      if (!salesRepId) {
+        toast.error('Sales representative is required for estimates');
+        return;
+      }
+      if (!hasValidItems) {
+        toast.error('At least one valid product is required for estimates');
+        return;
+      }
+      if (!messageText) {
+        toast.error('Message is required for estimates');
+        return;
+      }
+      if (!signatureBase64) {
+        toast.error('Signature is required for estimates');
+        return;
+      }
+
+      const payload = {
+        customerId,
+        salesRep: salesRepId,
+        message: messageText,
+        signature: signatureBase64,
+        items: document.items
+          .filter(
+            (item) =>
+              item.productCode?.trim() &&
+              item.description?.trim() &&
+              typeof item.quantity === 'number' &&
+              item.quantity > 0
+          )
+          .map((item) => ({
+            productCode: item.productCode,
+            description: item.description,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            discount: item.discount ?? 0,
+          })),
+        status,
+        ...(status === 'pending' ? { print: true } : {}),
+      };
+
+      console.log('Estimate ready payload:', payload);
+
+      try {
+        if (!isNew) {
+          if (!refNumber) {
+            toast.error('Reference number is required for edit estimate');
+            return;
+          }
+          const token = localStorage.getItem('token') || '';
+          await api.put(`/api/v1/estimate/${refNumber}`, { token, payload });
+        } else {
+          await api.post('/api/v1/estimate/save', payload);
+        }
+      } catch (error) {
+        console.error('Estimate save error:', error);
+        toast.error('Unable to save estimate');
+        return;
+      }
+    }
 
     if (isNew) {
       addDocument(document);
@@ -296,54 +618,22 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             toast.success('Document saved and printed successfully');
           } else {
             toast.error('Document saved but printing failed. Please check printer connection.');
-            // Fallback to PDF if printer fails
-            printReceiptAsPDF(document);
-            toast.info('Opening receipt as PDF instead');
           }
         } catch (error) {
           console.error('Print error:', error);
-          toast.error('Document saved but printing failed. Opening receipt as PDF instead.');
-          // Fallback to PDF if printer fails
-          printReceiptAsPDF(document);
+          toast.error('Document saved but printing failed. Please check printer connection.');
         }
       } else {
-        // Print to PDF if printer is not connected
-        printReceiptAsPDF(document);
-        toast.success('Document saved. Opening receipt as PDF...');
+        toast.error('Printer not connected. Please connect a printer to print.');
       }
     }
 
     navigate(`/${type === 'credit_note' ? 'credit-notes' : type + 's'}`);
   };
 
-  const handlePrint = async () => {
-    if (!isNew && id) {
-      await triggerPrint(id);
-      toast.success('Printing...');
-    }
-  };
 
-  const handleExport = () => {
-    // Mock export to SharePoint/Excel
-    const data = {
-      refNumber,
-      date: new Date().toISOString(),
-      customer: selectedCustomer?.name,
-      total,
-      salesRep,
-      items: items.map(i => ({
-        code: i.productCode,
-        description: i.description,
-        qty: i.quantity,
-        price: i.unitPrice,
-        amount: i.amount
-      }))
-    };
-    
-    // In real implementation, this would send to SharePoint API
-    console.log('Export data:', data);
-    toast.success('Exported to SharePoint/Excel');
-  };
+
+
 
   return (
     <MainLayout>
@@ -398,33 +688,135 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                 <div>
                   <Label className="text-xs sm:text-sm">Customer</Label>
                   <Select 
-                    value={selectedCustomer?.id} 
-                    onValueChange={(v) => setSelectedCustomer(customers.find(c => c.id === v) || null)}
+                    value={selectedCustomer ? getCustomerId(selectedCustomer) : undefined} 
+                    onOpenChange={(open) => {
+                      if (open) {
+                        loadCustomers();
+                      }
+                    }}
+                    onValueChange={(v) => {
+                      const match =
+                        effectiveCustomers.find((c, idx) => getCustomerId(c, idx) === v) || null;
+                      if (match) {
+                        setSelectedCustomer(match);
+                        return;
+                      }
+                      if (selectedCustomer && getCustomerId(selectedCustomer) === v) {
+                        setSelectedCustomer(selectedCustomer);
+                        return;
+                      }
+                      setSelectedCustomer(null);
+                    }}
                   >
                     <SelectTrigger className="text-sm">
-                      <SelectValue placeholder="Select customer..." />
+                      <SelectValue
+                        placeholder={
+                          selectedCustomer?.name ||
+                          (isLoadingCustomers ? 'Loading customers...' : 'Select customer...')
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {customers.map((customer) => (
-                        <SelectItem key={customer.id} value={customer.id}>
-                          {customer.name}
+                      {isLoadingCustomers && (
+                        <SelectItem key="loading" value="loading" disabled>
+                          Loading customers...
                         </SelectItem>
-                      ))}
+                      )}
+                      {!isLoadingCustomers && customersError && (
+                        <SelectItem key="error" value="error" disabled>
+                          {customersError}
+                        </SelectItem>
+                      )}
+                      {!isLoadingCustomers &&
+                        !customersError &&
+                        effectiveCustomers.map((customer, index) => {
+                          const customerId = getCustomerId(customer, index);
+                          return (
+                            <SelectItem key={customerId} value={customerId}>
+                            {customer.name}
+                          </SelectItem>
+                          );
+                        })}
+                      {!isLoadingCustomers &&
+                        !customersError &&
+                        selectedCustomer &&
+                        !effectiveCustomers.some(
+                          (customer, index) =>
+                            getCustomerId(customer, index) === getCustomerId(selectedCustomer)
+                        ) && (
+                          <SelectItem value={getCustomerId(selectedCustomer) || ''}>
+                            {selectedCustomer.name}
+                          </SelectItem>
+                        )}
+                      {!isLoadingCustomers &&
+                        !customersError &&
+                        effectiveCustomers.length === 0 && (
+                          <SelectItem key="empty" value="empty" disabled>
+                            No customers available
+                          </SelectItem>
+                        )}
                     </SelectContent>
                   </Select>
                 </div>
                 <div>
                   <Label className="text-xs sm:text-sm">Sales Representative</Label>
-                  <Select value={salesRep} onValueChange={setSalesRep}>
+                  <Select
+                    value={salesRep}
+                    onValueChange={(value) => {
+                      setSalesRep(value);
+                      const selectedRep = salesReps.find((rep) => rep.id === value);
+                      setSelectedSalesRepName((prev) => selectedRep?.name || prev);
+                    }}
+                    onOpenChange={(open) => {
+                      if (open) {
+                        loadSalesReps();
+                      }
+                    }}
+                  >
                     <SelectTrigger className="text-sm">
-                      <SelectValue />
+                      <SelectValue
+                        placeholder={
+                          selectedSalesRepName ||
+                          (isLoadingSalesReps ? 'Loading sales reps...' : 'Select sales rep...')
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
-                      {mockSalesReps.map((rep) => (
-                        <SelectItem key={rep} value={rep}>
-                          {rep}
+                      {isLoadingSalesReps && (
+                        <SelectItem key="loading-sales-reps" value="loading-sales-reps" disabled>
+                          Loading sales reps...
                         </SelectItem>
-                      ))}
+                      )}
+                      {!isLoadingSalesReps && salesRepsError && (
+                        <SelectItem key="sales-reps-error" value="sales-reps-error" disabled>
+                          {salesRepsError}
+                        </SelectItem>
+                      )}
+                      {!isLoadingSalesReps &&
+                        !salesRepsError &&
+                        salesReps.map((rep, index) => (
+                          <SelectItem
+                            key={rep.id || `sales-rep-${index}`}
+                            value={rep.id || `sales-rep-${index}`}
+                          >
+                            {rep.name}
+                          </SelectItem>
+                        ))}
+                      {!isLoadingSalesReps &&
+                        !salesRepsError &&
+                        salesRep &&
+                        !salesReps.some((rep) => rep.id === salesRep) && (
+                          <SelectItem value={salesRep}>
+                            {selectedSalesRepName || 'Sales Rep'}
+                          </SelectItem>
+                        )}
+                      {!isLoadingSalesReps &&
+                        !salesRepsError &&
+                        salesReps.length === 0 && (
+                          <SelectItem key="sales-reps-empty" value="sales-reps-empty" disabled>
+                            No sales reps available
+                          </SelectItem>
+                        )}
                     </SelectContent>
                   </Select>
                 </div>
@@ -433,11 +825,15 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3 sm:mt-4 text-xs sm:text-sm">
                   <div>
                     <p className="text-muted-foreground">Billing Address</p>
-                    <p className="line-clamp-2">{selectedCustomer.billingAddress}</p>
+                    <p className="line-clamp-2">
+                      {formatAddress(selectedCustomer.billingAddress)}
+                    </p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Shipping Address</p>
-                    <p className="line-clamp-2">{selectedCustomer.shippingAddress}</p>
+                    <p className="line-clamp-2">
+                      {formatAddress(selectedCustomer.shippingAddress)}
+                    </p>
                   </div>
                 </div>
               )}
@@ -708,10 +1104,26 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             <div className="glass-card rounded-xl p-4 sm:p-6 ">
               <h2 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Summary</h2>
               <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Subtotal</span>
-                  <span>{formatCurrency(subtotalBeforeDiscount)}</span>
-                </div>
+                {type !== 'estimate' && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span>{formatCurrency(subtotalBeforeDiscount)}</span>
+                  </div>
+                )}
+                {items.filter(item => item.discount <= 0).map((item, index) => {
+                  const baseName = getBaseProductName(item.description);
+                  return (
+                    <div key={`${item.id}-no-discount`}>
+                      {index === 0 && (
+                        <div className="text-muted-foreground mb-1">Items</div>
+                      )}
+                      <div className="flex justify-between ml-0">
+                        <span className="text-muted-foreground">{baseName}</span>
+                        <span className="text-muted-foreground">{formatCurrency(item.amount)}</span>
+                      </div>
+                    </div>
+                  );
+                })}
                 {items.filter(item => item.discount > 0).map((item, index) => {
                   const itemDiscountAmount = item.quantity * item.unitPrice * (item.discount / 100);
                   const baseName = getBaseProductName(item.description);
@@ -721,21 +1133,27 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                         <div className="text-muted-foreground mb-1">Discount</div>
                       )}
                       <div className="flex justify-between ml-0">
-                        <span className="text-muted-foreground">
-                          {baseName} - {item.discount}%
+                        <span className="text-muted-foreground">{baseName}</span>
+                        <span className="text-success">
+                          {item.discount}% (-{formatCurrency(itemDiscountAmount)})
                         </span>
-                        <span className="text-success">-{formatCurrency(itemDiscountAmount)}</span>
                       </div>
                     </div>
                   );
                 })}
+                {type === 'estimate' && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Total Discount</span>
+                    <span className="text-success">-{formatCurrency(discountAmount)}</span>
+                  </div>
+                )}
                 {type === 'invoice' && (
                   <div className="flex justify-between">
-                  <span className="text-muted-foreground">VAT (12.5%)</span>
-                  <span>{formatCurrency(tax)}</span>
-                </div>
+                    <span className="text-muted-foreground">VAT (12.5%)</span>
+                    <span>{formatCurrency(tax)}</span>
+                  </div>
                 )}
-                
+
                 <div className="border-t border-border pt-2 sm:pt-3 flex justify-between font-semibold text-sm sm:text-base">
                   <span>Total</span>
                   <span className="text-primary">{formatCurrency(total)}</span>
