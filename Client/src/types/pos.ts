@@ -51,6 +51,7 @@ export interface User {
   email: string;
   role: UserRole;
   avatar?: string;
+  permissions?: string[];
 }
 
 export interface DeviceStatus {

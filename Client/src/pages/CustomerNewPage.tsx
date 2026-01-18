@@ -1,9 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import axios from 'axios';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowLeft, Save, User, Mail, Phone, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '@/services/api';
 
 const addressSchema = z.object({
   street: z.string().min(1, 'Street is required').max(255),
@@ -39,10 +39,31 @@ const customerSchema = z.object({
 
 type CustomerFormData = z.infer<typeof customerSchema>;
 
+interface IAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
+interface BackendCustomer {
+  _id: string;
+  customerCode?: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  billingAddress?: IAddress;
+  shippingAddress?: IAddress;
+}
+
 const CustomerNewPage: React.FC = () => {
   const navigate = useNavigate();
+  const { id } = useParams();
+  const isEditMode = !!id;
   const [useSameAddress, setUseSameAddress] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingCustomer, setIsLoadingCustomer] = useState(isEditMode);
   
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -66,6 +87,62 @@ const CustomerNewPage: React.FC = () => {
       },
     },
   });
+
+  // Fetch customer data when in edit mode
+  useEffect(() => {
+    const fetchCustomer = async () => {
+      if (!isEditMode || !id) return;
+
+      try {
+        setIsLoadingCustomer(true);
+        const response = await api.get(`/api/v1/customer/${id}`);
+        const backendCustomer: BackendCustomer = response.data.customer;
+        
+        // Pre-fill form with customer data
+        form.reset({
+          name: backendCustomer.name || '',
+          email: backendCustomer.email || '',
+          phone: backendCustomer.phone || '',
+          billingAddress: {
+            street: backendCustomer.billingAddress?.street || '',
+            city: backendCustomer.billingAddress?.city || '',
+            state: backendCustomer.billingAddress?.state || '',
+            postalCode: backendCustomer.billingAddress?.postalCode || '',
+            country: backendCustomer.billingAddress?.country || '',
+          },
+          shippingAddress: backendCustomer.shippingAddress ? {
+            street: backendCustomer.shippingAddress.street || '',
+            city: backendCustomer.shippingAddress.city || '',
+            state: backendCustomer.shippingAddress.state || '',
+            postalCode: backendCustomer.shippingAddress.postalCode || '',
+            country: backendCustomer.shippingAddress.country || '',
+          } : undefined,
+        });
+
+        // Check if shipping address is the same as billing
+        const billing = backendCustomer.billingAddress;
+        const shipping = backendCustomer.shippingAddress;
+        if (billing && shipping) {
+          const isSame = 
+            billing.street === shipping.street &&
+            billing.city === shipping.city &&
+            billing.state === shipping.state &&
+            billing.postalCode === shipping.postalCode &&
+            billing.country === shipping.country;
+          setUseSameAddress(isSame);
+        }
+      } catch (error: any) {
+        console.error('Error fetching customer:', error);
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch customer';
+        toast.error(errorMessage);
+        navigate('/customers');
+      } finally {
+        setIsLoadingCustomer(false);
+      }
+    };
+
+    fetchCustomer();
+  }, [id, isEditMode, form, navigate]);
 
   // Watch billing address to copy to shipping when checkbox is checked
   const billingAddress = form.watch('billingAddress');
@@ -139,7 +216,6 @@ const CustomerNewPage: React.FC = () => {
         },
       });
       
-      toast.success(response.data.message || 'Customer created successfully');
       navigate('/customers');
     } catch (error: any) {
       if (error.response?.status === 401) {
@@ -156,6 +232,16 @@ const CustomerNewPage: React.FC = () => {
     }
   };
 
+  if (isLoadingCustomer) {
+    return (
+      <MainLayout>
+        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+          <p className="text-muted-foreground">Loading customer data...</p>
+        </div>
+      </MainLayout>
+    );
+  }
+
   return (
     <MainLayout>
       <div className="space-y-4 md:space-y-6">
@@ -171,8 +257,12 @@ const CustomerNewPage: React.FC = () => {
             Back
           </Button>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">New Customer</h1>
-            <p className="text-sm text-muted-foreground">Add a new customer to your database</p>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">
+              {isEditMode ? 'Edit Customer' : 'New Customer'}
+            </h1>
+            <p className="text-sm text-muted-foreground">
+              {isEditMode ? 'Update customer information' : 'Add a new customer to your database'}
+            </p>
           </div>
         </div>
 
@@ -445,9 +535,11 @@ const CustomerNewPage: React.FC = () => {
               >
                 Cancel
               </Button>
-              <Button type="submit" className="w-full sm:w-auto" disabled={isLoading}>
+              <Button type="submit" className="w-full sm:w-auto" disabled={isLoading || isLoadingCustomer}>
                 <Save className="h-4 w-4 mr-2" />
-                {isLoading ? 'Saving...' : 'Save Customer'}
+                {isLoading 
+                  ? (isEditMode ? 'Updating...' : 'Saving...') 
+                  : (isEditMode ? 'Update Customer' : 'Save Customer')}
               </Button>
             </div>
           </form>

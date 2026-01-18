@@ -8,7 +8,6 @@ export const COMPANY_INFO = {
 } as const;
 
 export const COMPANY_FULL_ADDRESS = `${COMPANY_INFO.address}. ${COMPANY_INFO.country}`;
-console.log(COMPANY_FULL_ADDRESS);
 
 export const TAX_RATE = 12.5;
 export const CURRENCY = 'TTD';

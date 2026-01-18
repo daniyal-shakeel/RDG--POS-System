@@ -172,9 +172,7 @@ const login = async (req: Request, res: Response) => {
       role: selectedRole.name,
       permissions: selectedRole.permissionKeys || [],
     };
-
-    console.log(tokenPayload, "tokenPayload");
-    console.log(JWT_SECRET, "JWT_SECRET");
+    
     const token = jwt.sign(tokenPayload, JWT_SECRET, {
       expiresIn: JWT_EXPIRES_IN,
     } as jwt.SignOptions);
