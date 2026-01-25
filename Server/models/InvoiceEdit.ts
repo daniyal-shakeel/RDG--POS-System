@@ -1,9 +1,9 @@
 import { Schema, model, Document, Types } from "mongoose";
 
 /**
- * Line items stored on an invoice.
+ * Line items stored on an invoice edit.
  */
-export interface IInvoiceItem {
+export interface IInvoiceEditItem {
   productCode: string;
   description: string;
   quantity: number;
@@ -12,28 +12,25 @@ export interface IInvoiceItem {
 }
 
 /**
- * Invoice model captures issued invoices, payments, and status state.
- * - If converted from an estimate, the same signature should be reused.
- * - Status rules (handled in business logic):
- *   - depositReceived === total -> paid
- *   - 0 < depositReceived < total -> partial (balance/due updated)
- *   - depositReceived === 0 -> pending (default stays draft until issued)
+ * Invoice edit captures updated invoice data while preserving history.
  */
-export interface IInvoice extends Document {
-  invoiceNumber: string;
-  editIds?: Types.ObjectId[];
-  editCount: number;
-  depositReceivedTotal?: number;
+export interface IInvoiceEdit extends Document {
+  invoiceReference: string;
+  baseInvoiceId: Types.ObjectId;
+  previousVersionId?: Types.ObjectId;
+  previousVersionSource?: "invoice" | "edit";
   customerId: Types.ObjectId;
   salesRep?: Types.ObjectId;
-  paymentId?: Types.ObjectId; // Reference to the payment record (all invoices with same payment share same paymentId)
-  items: IInvoiceItem[];
+  items: IInvoiceEditItem[];
   message?: string;
   signature?: string;
   estimateReference?: string;
   convertedFromEstimate?: Types.ObjectId;
   paymentTerms: "net7" | "net15" | "net30" | "net60" | "dueOnReceipt";
   depositReceived: number;
+  depositAdded: number;
+  paymentMethod?: "cash" | "card" | "bank_transfer" | "cheque" | "other";
+  balanceAfterEdit: number;
   status: "draft" | "pending" | "partial" | "paid" | "overpaid";
   total: number;
   due: number;
@@ -44,7 +41,7 @@ export interface IInvoice extends Document {
   updatedAt: Date;
 }
 
-const InvoiceItemSchema = new Schema<IInvoiceItem>(
+const InvoiceEditItemSchema = new Schema<IInvoiceEditItem>(
   {
     productCode: { type: String, required: true, trim: true },
     description: { type: String, required: true, trim: true },
@@ -55,15 +52,15 @@ const InvoiceItemSchema = new Schema<IInvoiceItem>(
   { _id: false }
 );
 
-const InvoiceSchema = new Schema<IInvoice>(
+const InvoiceEditSchema = new Schema<IInvoiceEdit>(
   {
-    invoiceNumber: { type: String, required: true, unique: true, trim: true },
-    editIds: { type: [Schema.Types.ObjectId], ref: "InvoiceEdit", default: [] },
-    editCount: { type: Number, default: 0, min: 0 },
+    invoiceReference: { type: String, required: true, trim: true },
+    baseInvoiceId: { type: Schema.Types.ObjectId, ref: "Invoice", required: true },
+    previousVersionId: { type: Schema.Types.ObjectId },
+    previousVersionSource: { type: String, enum: ["invoice", "edit"] },
     customerId: { type: Schema.Types.ObjectId, ref: "Customer", required: true },
     salesRep: { type: Schema.Types.ObjectId, ref: "User" },
-    paymentId: { type: Schema.Types.ObjectId, ref: "Payment" },
-    items: { type: [InvoiceItemSchema], default: [] },
+    items: { type: [InvoiceEditItemSchema], default: [] },
     message: { type: String },
     signature: { type: String },
     estimateReference: { type: String, trim: true },
@@ -74,6 +71,12 @@ const InvoiceSchema = new Schema<IInvoice>(
       default: "dueOnReceipt",
     },
     depositReceived: { type: Number, default: 0, min: 0 },
+    depositAdded: { type: Number, default: 0 },
+    paymentMethod: {
+      type: String,
+      enum: ["cash", "card", "bank_transfer", "cheque", "other"],
+    },
+    balanceAfterEdit: { type: Number, default: 0 },
     status: {
       type: String,
       enum: ["draft", "pending", "partial", "paid", "overpaid"],
@@ -88,4 +91,4 @@ const InvoiceSchema = new Schema<IInvoice>(
   { timestamps: true }
 );
 
-export default model<IInvoice>("Invoice", InvoiceSchema);
+export default model<IInvoiceEdit>("InvoiceEdit", InvoiceEditSchema);

@@ -1,4 +1,5 @@
 import { Response } from "express";
+import { randomUUID } from "crypto";
 import { Types } from "mongoose";
 import { AuthRequest } from "../middleware/auth";
 import Estimate from "../models/Estimate";
@@ -129,17 +130,15 @@ const createEstimate = async (req: AuthRequest, res: Response) => {
       normalizedItems.reduce((sum, item) => sum + item.amount, 0).toFixed(2)
     );
 
-    let reference = `EST-${Date.now()}-${Math.random()
-      .toString(16)
-      .slice(2, 6)
-      .toUpperCase()}`;
-      let existing = await Estimate.findOne({ reference }).lean();
-      let attempts = 0;
+    const makeReference = () => {
+      const raw = randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
+      return `EST-${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
+    };
+    let reference = makeReference();
+    let existing = await Estimate.findOne({ reference }).lean();
+    let attempts = 0;
     while (existing && attempts < 5) {
-      reference = `EST-${Date.now()}-${Math.random()
-        .toString(16)
-        .slice(2, 6)
-        .toUpperCase()}`;
+      reference = makeReference();
       existing = await Estimate.findOne({ reference }).lean();
       attempts += 1;
     }
@@ -491,6 +490,26 @@ const updateEstimateStatus = async (req: AuthRequest, res: Response) => {
   });
 };
 
+/**
+ * Convert an estimate into an invoice.
+ * For now, this is a placeholder that validates permission and responds
+ * with the intention. Implement actual conversion logic when available.
+ */
+const convertEstimateToInvoice = async (req: AuthRequest, res: Response) => {
+  const reference =
+    typeof req.params?.reference === "string" ? req.params.reference.trim() : "";
+  if (!reference) {
+    return res.status(400).json({
+      message: "Estimate reference is required",
+    });
+  }
+
+  return res.status(200).json({
+    message: "Estimate conversion endpoint reached",
+    reference,
+  });
+};
+
 export {
   createEstimate,
   getEstimates,
@@ -498,5 +517,6 @@ export {
   updateEstimate,
   deleteEstimate,
   updateEstimateStatus,
+  convertEstimateToInvoice,
 };
 

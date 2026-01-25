@@ -238,11 +238,13 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
           <div className="flex items-center gap-2 xl:gap-3 mb-2 xl:mb-3">
             <div className="h-8 w-8 xl:h-10 xl:w-10 rounded-full bg-primary/20 flex items-center justify-center">
               <span className="text-primary font-semibold text-xs xl:text-sm">
-                {user?.name?.charAt(0) || 'U'}
+                {user?.name?.charAt(0)?.toUpperCase() || 'U'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs xl:text-sm font-medium truncate">{user?.name || 'Guest'}</p>
+              <p className="text-xs xl:text-sm font-medium truncate">
+                {user?.name ? user.name.charAt(0).toUpperCase() + user.name.slice(1) : 'Guest'}
+              </p>
               <p className="text-[10px] xl:text-xs text-muted-foreground capitalize">
                 {user?.originalRole || (() => {
                   if (!user?.role) return 'Not logged in';

@@ -1,4 +1,4 @@
-import { Schema, model, Document } from 'mongoose';
+import { Schema, model, Document, Types } from 'mongoose';
 
 /**
  * Address subdocument used for billing and shipping addresses on a customer.
@@ -19,11 +19,13 @@ interface ICustomer extends Document {
   name: string;
   email?: string;
   phone?: string;
+  salesRep?: Types.ObjectId;
   billingAddress?: IAddress;
   shippingAddress?: IAddress;
   notes?: string;
   creditLimit?: number;
   balance?: number;
+  paymentId?: Types.ObjectId; // Reference to the payment record for this customer
   status: 'active' | 'archived';
   createdAt: Date;
   updatedAt: Date;
@@ -65,6 +67,14 @@ const CustomerSchema = new Schema<ICustomer>(
       type: String,
       enum: ['active', 'archived'],
       default: 'active',
+    },
+    salesRep: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
+    },
+    paymentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Payment',
     },
   },
   { timestamps: true }

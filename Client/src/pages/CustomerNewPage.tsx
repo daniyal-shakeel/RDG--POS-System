@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -65,6 +65,8 @@ const CustomerNewPage: React.FC = () => {
   const [useSameAddress, setUseSameAddress] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingCustomer, setIsLoadingCustomer] = useState(isEditMode);
+  const initialValuesRef = useRef<CustomerFormData | null>(null);
+  const initialUseSameAddressRef = useRef<boolean>(true);
   
   const form = useForm<CustomerFormData>({
     resolver: zodResolver(customerSchema),
@@ -100,7 +102,7 @@ const CustomerNewPage: React.FC = () => {
         const backendCustomer: BackendCustomer = response.data.customer;
         
         // Pre-fill form with customer data
-        form.reset({
+        const normalizedValues: CustomerFormData = {
           name: backendCustomer.name || '',
           email: backendCustomer.email || '',
           phone: backendCustomer.phone || '',
@@ -118,7 +120,10 @@ const CustomerNewPage: React.FC = () => {
             postalCode: backendCustomer.shippingAddress.postalCode || '',
             country: backendCustomer.shippingAddress.country || '',
           } : undefined,
-        });
+        };
+
+        form.reset(normalizedValues);
+        initialValuesRef.current = normalizedValues;
 
         // Check if shipping address is the same as billing
         const billing = backendCustomer.billingAddress;
@@ -131,6 +136,9 @@ const CustomerNewPage: React.FC = () => {
             billing.postalCode === shipping.postalCode &&
             billing.country === shipping.country;
           setUseSameAddress(isSame);
+          initialUseSameAddressRef.current = isSame;
+        } else {
+          initialUseSameAddressRef.current = shipping ? false : true;
         }
       } catch (error: any) {
         console.error('Error fetching customer:', error);
@@ -175,48 +183,135 @@ const CustomerNewPage: React.FC = () => {
   };
 
   const onSubmit = async (data: CustomerFormData) => {
-    // Prepare data for backend
-    const customerData: {
-      name: string;
-      email: string;
-      phone: string;
-      billingAddress: typeof data.billingAddress;
-      shippingAddress?: typeof data.billingAddress;
-    } = {
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      billingAddress: data.billingAddress,
-    };
-
-    // Handle shipping address
-    if (useSameAddress) {
-      // Use billing address as shipping address
-      customerData.shippingAddress = data.billingAddress;
-    } else if (data.shippingAddress) {
-      // Check if shipping address has any values
-      const hasShippingData = Object.values(data.shippingAddress).some(
-        (v) => v && v.trim() !== ''
-      );
-      if (hasShippingData) {
-        customerData.shippingAddress = data.shippingAddress;
-      }
-      // If no shipping data, shippingAddress will be undefined (optional)
-    }
-    
     setIsLoading(true);
+    const refreshCustomerNames = async () => {
+      try {
+        const customersResponse = await api.get('/api/v1/customer');
+        const customers = Array.isArray(customersResponse.data?.customers)
+          ? customersResponse.data.customers
+          : [];
+        const customerPayload = customers
+          .map((customer: any) => ({
+            id: customer?.id || customer?._id || '',
+            name: customer?.name || customer?.customerName || customer?.email || '',
+            billingAddress: customer?.billingAddress || '',
+            shippingAddress: customer?.shippingAddress || '',
+          }))
+          .filter((customer: any) => customer.id && customer.name);
+        localStorage.setItem('customerNames', JSON.stringify(customerPayload));
+      } catch (refreshError) {
+        console.warn('Failed to refresh customers:', refreshError);
+      }
+    };
     try {
       // Get token from localStorage and add to Authorization header
       const token = localStorage.getItem('token') || '';
       const trimmedToken = token.trim();
-      
-      const response = await axios.post('http://localhost:5500/api/v1/customer', customerData, {
-        headers: {
-          'Authorization': `Bearer ${trimmedToken}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
+
+      if (isEditMode && id) {
+        const originalValues = initialValuesRef.current ?? data;
+        const changes: Record<string, any> = {};
+
+        // Top-level fields
+        ['name', 'email', 'phone'].forEach((field) => {
+          const typedField = field as keyof CustomerFormData;
+          if (data[typedField] !== (originalValues as any)[typedField]) {
+            changes[typedField] = data[typedField];
+          }
+        });
+
+        // Billing address diff
+        const billingChanges: Record<string, string> = {};
+        ['street', 'city', 'state', 'postalCode', 'country'].forEach((key) => {
+          const newVal = data.billingAddress?.[key as keyof IAddress] || '';
+          const oldVal = originalValues.billingAddress?.[key as keyof IAddress] || '';
+          if (newVal !== oldVal) {
+            billingChanges[key] = newVal;
+          }
+        });
+        if (Object.keys(billingChanges).length > 0) {
+          changes.billingAddress = billingChanges;
+        }
+
+        const currentShippingSame = useSameAddress;
+        const initialShippingSame = initialUseSameAddressRef.current;
+
+        if (currentShippingSame) {
+          // If user switched to using same address, flag it
+          if (currentShippingSame !== initialShippingSame) {
+            changes.shippingSameAsBilling = true;
+          }
+        } else {
+          const originalShippingAddress = initialShippingSame
+            ? originalValues.billingAddress
+            : originalValues.shippingAddress;
+
+          const shippingChanges: Record<string, string> = {};
+          ['street', 'city', 'state', 'postalCode', 'country'].forEach((key) => {
+            const newVal = data.shippingAddress?.[key as keyof IAddress] || '';
+            const oldVal = originalShippingAddress?.[key as keyof IAddress] || '';
+            if (newVal !== oldVal) {
+              shippingChanges[key] = newVal;
+            }
+          });
+
+          if (Object.keys(shippingChanges).length > 0 || currentShippingSame !== initialShippingSame) {
+            changes.shippingSameAsBilling = false;
+          }
+
+          if (Object.keys(shippingChanges).length > 0) {
+            changes.shippingAddress = shippingChanges;
+          }
+        }
+
+        if (Object.keys(changes).length === 0) {
+          toast.info('Please edit at least one field before updating.');
+          return;
+        }
+
+        await axios.put(`http://localhost:5500/api/v1/customer/${id}`, changes, {
+          headers: {
+            'Authorization': `Bearer ${trimmedToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+      } else {
+        // Prepare data for backend (create)
+        const customerData: {
+          name: string;
+          email: string;
+          phone: string;
+          billingAddress: typeof data.billingAddress;
+          shippingAddress?: typeof data.billingAddress;
+          shippingSameAsBilling?: boolean;
+        } = {
+          name: data.name,
+          email: data.email,
+          phone: data.phone,
+          billingAddress: data.billingAddress,
+        };
+
+        if (useSameAddress) {
+          customerData.shippingSameAsBilling = true;
+        } else if (data.shippingAddress) {
+          const hasShippingData = Object.values(data.shippingAddress).some(
+            (v) => v && v.trim() !== ''
+          );
+          if (hasShippingData) {
+            customerData.shippingSameAsBilling = false;
+            customerData.shippingAddress = data.shippingAddress;
+          }
+        }
+
+        await axios.post('http://localhost:5500/api/v1/customer', customerData, {
+          headers: {
+            'Authorization': `Bearer ${trimmedToken}`,
+            'Content-Type': 'application/json',
+          },
+        });
+        await refreshCustomerNames();
+      }
+
       navigate('/customers');
     } catch (error: any) {
       if (error.response?.status === 401) {

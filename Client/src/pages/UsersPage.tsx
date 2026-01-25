@@ -126,6 +126,31 @@ export default function UsersPage() {
     }
   };
 
+  const refreshSalesReps = async () => {
+    try {
+      const usersResponse = await api.get('/api/v1/user', {
+        params: { role: 'Sales Representative' },
+      });
+      const users = Array.isArray(usersResponse.data?.users) ? usersResponse.data.users : [];
+      const salesReps = users
+        .filter((user: any) => {
+          const roles = Array.isArray(user?.roles) ? user.roles : [];
+          return roles.some(
+            (role: any) => (role?.name || '').toLowerCase() === 'sales representative'
+          );
+        })
+        .map((user: any) => ({
+          id: user?.id || user?._id || '',
+          name: user?.fullName || user?.name || user?.email || '',
+          email: user?.email || '',
+        }))
+        .filter((rep: any) => rep.id || rep.name || rep.email);
+      localStorage.setItem('salesReps', JSON.stringify(salesReps));
+    } catch (refreshError) {
+      console.warn('Failed to refresh sales reps:', refreshError);
+    }
+  };
+
   const onSubmit = async (data: UserFormData) => {
     setIsSubmitting(true);
     try {
@@ -140,6 +165,9 @@ export default function UsersPage() {
       setIsCreateDialogOpen(false);
       form.reset();
       fetchUsers(); // Refresh the list
+      if (data.role === 'Sales Representative') {
+        await refreshSalesReps();
+      }
     } catch (error: any) {
       console.error('Error creating user:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to create user';

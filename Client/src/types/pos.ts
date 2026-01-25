@@ -1,6 +1,22 @@
 export type DocumentType = 'invoice' | 'receipt' | 'credit_note' | 'refund' | 'estimate';
-export type DocumentStatus = 'draft' | 'pending' | 'approved' | 'paid' | 'partial' | 'overdue' | 'cancelled' | 'converted';
+
+// Per-document-type statuses
+export type EstimateStatus = 'draft' | 'pending' | 'accepted' | 'converted' | 'expired';
+export type InvoiceStatus = 'draft' | 'pending' | 'partial' | 'paid' | 'overpaid';
+export type ReceiptStatus = 'draft' | 'completed';
+export type CreditNoteStatus = 'DRAFT' | 'APPROVED';
+export type RefundStatus = 'DRAFT' | 'REFUNDED';
+
+// Combined status type for documents
+export type DocumentStatus =
+  | EstimateStatus
+  | InvoiceStatus
+  | ReceiptStatus
+  | CreditNoteStatus
+  | RefundStatus;
+
 export type UserRole = 'super_admin' | 'admin' | 'sales_rep' | 'stock_keeper';
+export type UserStatus = 'active' | 'inactive' | 'suspended';
 
 export interface LineItem {
   id: string;
@@ -50,6 +66,7 @@ export interface User {
   name: string;
   email: string;
   role: UserRole;
+  status?: UserStatus;
   avatar?: string;
   permissions?: string[];
   originalRole?: string; // Store original backend role name for display
@@ -65,6 +82,5 @@ export interface SalesStats {
   weekSales: number;
   monthSales: number;
   pendingInvoices: number;
-  overdueAmount: number;
   documentsToday: number;
 }

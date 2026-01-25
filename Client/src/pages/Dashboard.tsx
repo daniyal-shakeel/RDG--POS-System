@@ -9,7 +9,6 @@ import {
   DollarSign, 
   FileText, 
   Clock, 
-  AlertTriangle,
   TrendingUp,
   ArrowUpRight,
   Printer
@@ -81,12 +80,6 @@ export default function Dashboard() {
             title="Pending"
             value={mockStats.pendingInvoices}
             icon={<Clock className="h-4 w-4 xl:h-5 xl:w-5" />}
-          />
-          <StatCard
-            title="Overdue"
-            value={formatCurrency(mockStats.overdueAmount)}
-            icon={<AlertTriangle className="h-4 w-4 xl:h-5 xl:w-5" />}
-            trend={{ value: 3.1, isPositive: false }}
           />
         </div>
 

@@ -25,6 +25,8 @@ const POSContext = createContext<POSContextType | undefined>(undefined);
 // Constants for localStorage keys
 const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
+const CUSTOMER_NAMES_KEY = 'customerNames';
+const SALES_REPS_KEY = 'salesReps';
 
 // Helper function to map backend role to frontend UserRole
 const mapRoleToUserRole = (role: string): UserRole => {
@@ -105,6 +107,48 @@ export function POSProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(USER_KEY, JSON.stringify(mappedUser));
       setUser(mappedUser);
 
+      // Fetch customers and sales reps for allowed roles
+      const allowedRoles = ['Super Admin', 'Admin', 'Sales Representative'];
+      if (allowedRoles.includes(userData.role)) {
+        try {
+          const [customersResponse, usersResponse] = await Promise.all([
+            api.get('/api/v1/customer'),
+            api.get('/api/v1/user', { params: { role: 'Sales Representative' } }),
+          ]);
+
+          const customers = Array.isArray(customersResponse.data?.customers)
+            ? customersResponse.data.customers
+            : [];
+          const customerPayload = customers
+            .map((customer: any) => ({
+              id: customer?.id || customer?._id || '',
+              name: customer?.name || customer?.customerName || customer?.email || '',
+              billingAddress: customer?.billingAddress || '',
+              shippingAddress: customer?.shippingAddress || '',
+            }))
+            .filter((customer: any) => customer.id && customer.name);
+          localStorage.setItem(CUSTOMER_NAMES_KEY, JSON.stringify(customerPayload));
+
+          const users = Array.isArray(usersResponse.data?.users) ? usersResponse.data.users : [];
+          const salesReps = users
+            .filter((user: any) => {
+              const roles = Array.isArray(user?.roles) ? user.roles : [];
+              return roles.some((role: any) =>
+                (role?.name || '').toLowerCase() === 'sales representative'
+              );
+            })
+            .map((user: any) => ({
+              id: user?.id || user?._id || '',
+              name: user?.fullName || user?.name || user?.email || '',
+              email: user?.email || '',
+            }))
+            .filter((rep: any) => rep.id || rep.name || rep.email);
+          localStorage.setItem(SALES_REPS_KEY, JSON.stringify(salesReps));
+        } catch (fetchError) {
+          console.warn('Failed to load customers or sales reps:', fetchError);
+        }
+      }
+
       return true;
     } catch (error: any) {
       console.error('Login error:', error);
@@ -117,6 +161,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
       // Clear any partial data
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(CUSTOMER_NAMES_KEY);
+      localStorage.removeItem(SALES_REPS_KEY);
       setUser(null);
       throw error;
     }
@@ -140,6 +186,8 @@ export function POSProvider({ children }: { children: ReactNode }) {
       // Always clear local storage and user state
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(CUSTOMER_NAMES_KEY);
+      localStorage.removeItem(SALES_REPS_KEY);
       setUser(null);
     }
   };

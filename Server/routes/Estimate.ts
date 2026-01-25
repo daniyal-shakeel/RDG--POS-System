@@ -6,6 +6,7 @@ import {
   updateEstimate,
   deleteEstimate,
   updateEstimateStatus,
+  convertEstimateToInvoice,
 } from "../controllers/Estimate";
 import { authenticate } from "../middleware/auth";
 import { requirePermission } from "../middleware/permissions";
@@ -21,6 +22,11 @@ estimateRouter.get("/:reference", requirePermission("estimate.view"), getEstimat
 estimateRouter.put("/:reference", requirePermission("estimate.update"), updateEstimate);
 estimateRouter.delete("/:id", requirePermission("estimate.delete"), deleteEstimate);
 estimateRouter.patch("/:id/status", requirePermission("estimate.update"), updateEstimateStatus);
+estimateRouter.post(
+  "/:reference/convert",
+  requirePermission("estimate.convertToInvoice"),
+  convertEstimateToInvoice
+);
 
 export default estimateRouter;
 

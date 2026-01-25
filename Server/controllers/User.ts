@@ -5,7 +5,6 @@ import User from "../models/User";
 import Role from "../models/Role";
 import { validateEmail, validateName, validatePhone, validateAddress } from "../utils/validation";
 import { getDefaultPermissionsForRole } from "../utils/permissions";
-import { getRedisClient } from "../config/redis";
 import { AuthRequest } from "../middleware/auth";
 
 type CreateUserBody = {
@@ -21,38 +20,6 @@ type CreateUserBody = {
     postalCode?: string;
     country?: string;
   };
-};
-
-const USER_LIST_CACHE_KEY = "users:all";
-const USER_ROLE_LIST_CACHE_PREFIX = "users:role:";
-const USER_CACHE_PREFIX = "users:";
-const USER_CACHE_TTL_SECONDS = 300;
-
-const runCacheOps = async (ops: Promise<unknown>[]) => {
-  if (!ops.length) {
-    return;
-  }
-  try {
-    await Promise.all(ops);
-  } catch (error) {
-    console.error("Redis cache error:", error);
-  }
-};
-
-const invalidateUserListCaches = async (cacheClient: any) => {
-  try {
-    const keys: string[] = [USER_LIST_CACHE_KEY];
-    for await (const key of cacheClient.scanIterator({
-      MATCH: `${USER_ROLE_LIST_CACHE_PREFIX}*`,
-    })) {
-      keys.push(key as string);
-    }
-    if (keys.length) {
-      await cacheClient.del(...keys);
-    }
-  } catch (error) {
-    console.error("Redis cache error:", error);
-  }
 };
 
 const mapUserForResponse = (user: any) => ({
@@ -231,15 +198,6 @@ const createUser = async (req: AuthRequest, res: Response) => {
       roles: userWithRole?.roleIds || [],
     };
 
-    const cacheClient = await getRedisClient();
-    if (cacheClient) {
-      const userKey = `${USER_CACHE_PREFIX}${newUser._id.toString()}`;
-      await runCacheOps([
-        cacheClient.setEx(userKey, USER_CACHE_TTL_SECONDS, JSON.stringify(userPayload)),
-      ]);
-      await invalidateUserListCaches(cacheClient);
-    }
-
     return res.status(201).json({
       message: "User created successfully",
       user: userPayload,
@@ -276,25 +234,6 @@ const getUsers = async (req: AuthRequest, res: Response) => {
         message: `Invalid role filter. Allowed roles: ${allowedRoleFilters.join(", ")}`,
       });
     }
-    const roleCacheKey = normalizedRole
-      ? `${USER_ROLE_LIST_CACHE_PREFIX}${normalizedRole.toLowerCase().replace(/\s+/g, "-")}`
-      : USER_LIST_CACHE_KEY;
-
-    const cacheClient = await getRedisClient();
-    if (cacheClient) {
-      try {
-        const cachedUsers = await cacheClient.get(roleCacheKey);
-        if (cachedUsers) {
-          return res.status(200).json({
-            message: "Users fetched successfully",
-            users: JSON.parse(cachedUsers),
-          });
-        }
-      } catch (error) {
-        console.error("Redis cache read error:", error);
-      }
-    }
-
     let roleIdFilter: Types.ObjectId | null = null;
     if (normalizedRole) {
       const roleDoc = await Role.findOne({ name: normalizedRole }).lean();
@@ -315,16 +254,6 @@ const getUsers = async (req: AuthRequest, res: Response) => {
       .lean();
 
     const usersPayload = users.map(mapUserForResponse);
-
-    if (cacheClient) {
-      await runCacheOps([
-        cacheClient.setEx(
-          roleCacheKey,
-          USER_CACHE_TTL_SECONDS,
-          JSON.stringify(usersPayload)
-        ),
-      ]);
-    }
 
     return res.status(200).json({
       message: "Users fetched successfully",
@@ -401,15 +330,6 @@ const suspendUser = async (req: AuthRequest, res: Response) => {
       status: updatedUser?.status,
     };
 
-    const cacheClient = await getRedisClient();
-    if (cacheClient && updatedUser?._id) {
-      const userKey = `${USER_CACHE_PREFIX}${updatedUser._id.toString()}`;
-      await runCacheOps([
-        cacheClient.setEx(userKey, USER_CACHE_TTL_SECONDS, JSON.stringify(userPayload)),
-      ]);
-      await invalidateUserListCaches(cacheClient);
-    }
-
     return res.status(200).json({
       message: "User suspended successfully",
       user: userPayload,
@@ -484,15 +404,6 @@ const unsuspendUser = async (req: AuthRequest, res: Response) => {
       roles: updatedUser?.roleIds || [],
       status: updatedUser?.status,
     };
-
-    const cacheClient = await getRedisClient();
-    if (cacheClient && updatedUser?._id) {
-      const userKey = `${USER_CACHE_PREFIX}${updatedUser._id.toString()}`;
-      await runCacheOps([
-        cacheClient.setEx(userKey, USER_CACHE_TTL_SECONDS, JSON.stringify(userPayload)),
-      ]);
-      await invalidateUserListCaches(cacheClient);
-    }
 
     return res.status(200).json({
       message: "User unsuspended successfully. User can now log in.",
