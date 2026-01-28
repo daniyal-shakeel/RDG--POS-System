@@ -35,12 +35,7 @@ import { mockProducts, generateRefNumber } from '@/data/mockData';
 import { toast } from 'sonner';
 import { useBluetoothPrinter, ReceiptData } from '@/hooks/useBluetoothPrinter';
 import { format } from 'date-fns';
-import {
-  calculateInvoice,
-  canAcceptDeposit,
-  calculateItemAmount,
-  InvoiceCalculationResult,
-} from '@/utils/invoiceCalculations';
+import { printReceiptAsPDF } from '@/utils/pdfPrint';
 
 interface DocumentFormPageProps {
   type: DocumentType;
@@ -848,9 +843,6 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
   };
 
   const handleSave = async (status: 'draft' | 'pending') => {
-    if (isInvoiceEditView) {
-      return;
-    }
     if (!selectedCustomer) {
       toast.error('Please select a customer');
       return;
@@ -1342,15 +1334,25 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             toast.success('Document saved and printed successfully');
           } else {
             toast.error('Document saved but printing failed. Please check printer connection.');
+            // Fallback to PDF if printer fails
+            printReceiptAsPDF(document);
+            toast.info('Opening receipt as PDF instead');
           }
         } catch (error) {
           console.error('Print error:', error);
-          toast.error('Document saved but printing failed. Please check printer connection.');
+          toast.error('Document saved but printing failed. Opening receipt as PDF instead.');
+          // Fallback to PDF if printer fails
+          printReceiptAsPDF(document);
         }
       } else {
-        toast.error('Printer not connected. Please connect a printer to print.');
+        // Print to PDF if printer is not connected
+        printReceiptAsPDF(document);
+        toast.success('Document saved. Opening receipt as PDF...');
       }
     }
+
+    navigate(`/${type === 'credit_note' ? 'credit-notes' : type + 's'}`);
+  };
 
     // Navigate based on document type
     // Note: credit_note, refund, and receipt are handled above with early returns

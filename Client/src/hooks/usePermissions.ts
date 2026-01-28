@@ -22,10 +22,6 @@ export function usePermissions() {
     if (!permissions || permissions.length === 0) {
       return false;
     }
-    // Super Admin always has all permissions
-    if (permissions.includes('*')) {
-      return true;
-    }
     return checkPermission(permissions, permission);
   };
 
@@ -37,10 +33,6 @@ export function usePermissions() {
   const hasAnyPermission = (permissionList: string[]): boolean => {
     if (!permissions || permissions.length === 0) {
       return false;
-    }
-    // Super Admin always has all permissions
-    if (permissions.includes('*')) {
-      return true;
     }
     return permissionList.some(permission => checkPermission(permissions, permission));
   };
