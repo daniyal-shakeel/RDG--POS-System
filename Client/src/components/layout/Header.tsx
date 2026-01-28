@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Bell, Plus, QrCode } from 'lucide-react';
+import { Search, Plus, QrCode } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { usePOS } from '@/contexts/POSContext';
@@ -77,13 +77,6 @@ export function Header() {
           </DropdownMenuContent>
         </DropdownMenu>
 
-        {/* Notifications */}
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-4 w-4" />
-          <span className="absolute -top-1 -right-1 h-4 w-4 bg-destructive rounded-full text-[10px] font-bold flex items-center justify-center text-destructive-foreground">
-            3
-          </span>
-        </Button>
       </div>
     </header>
   );

@@ -1,509 +1,1009 @@
-import { Request, Response } from 'express';
-import { Invoice } from '../models/Invoice';
-import { Customer } from '../models/Customer';
-import { Product } from '../models/Product';
-import { validateData, ValidationError, invoiceStatusSchema, invoiceSchema, validateMongoId } from '../utils/validation';
-import mongoose from 'mongoose';
-
-/**
- * Helper function to calculate due date from payment terms
- * Supports formats like "Net 15", "Net 30", "Due on Receipt", etc.
- */
-const calculateDueDate = (paymentTerms: string, invoiceDate: Date = new Date()): Date => {
-    const dueDate = new Date(invoiceDate);
+import { Response } from "express";
+import { Types } from "mongoose";
+import { randomUUID } from "crypto";
+import { AuthRequest } from "../middleware/auth";
+import Invoice from "../models/Invoice";
+import InvoiceEdit from "../models/InvoiceEdit";
+import Customer from "../models/Customer";
+import User from "../models/User";
+import Payment from "../models/Payment";
+import { getRedisClient } from "../config/redis";
+import Role from "../models/Role";
+import Estimate from "../models/Estimate";
+import {
+  calculateInvoice,
+  normalizeAndValidateItem,
+  canAcceptDeposit,
+  InvoiceItem,
+} from "../utils/invoiceCalculations";
     
-    // Handle "Due on Receipt" or "Immediate"
-    if (paymentTerms.toLowerCase().includes('receipt') || paymentTerms.toLowerCase().includes('immediate')) {
-        return dueDate;
-    }
-    
-    // Extract number from payment terms (e.g., "Net 15" -> 15)
-    const match = paymentTerms.match(/\d+/);
-    if (match) {
-        const days = parseInt(match[0], 10);
-        dueDate.setDate(dueDate.getDate() + days);
-        return dueDate;
-    }
-    
-    // Default to 30 days if no number found
-    dueDate.setDate(dueDate.getDate() + 30);
-    return dueDate;
+type IncomingItem = {
+  productCode?: string;
+  description?: string;
+  quantity?: number;
+  price?: number;
+  discount?: number;
 };
 
-export const createInvoice = async (req: Request, res: Response) => {
-    try {
-        // Validate and sanitize input data
-        const validatedData = validateData(invoiceSchema, req.body);
-        console.log(validatedData);
-        
-        // Validate MongoDB ObjectIds
-        try {
-            validateMongoId(validatedData.customer_id);
-            validateMongoId(validatedData.sales_rep_id);
-            validatedData.items.forEach(item => {
-                validateMongoId(item.product_id);
-            });
-            if (validatedData.estimate_id) {
-                validateMongoId(validatedData.estimate_id);
-            }
-        } catch (error) {
-            if (error instanceof ValidationError) {
-                return res.status(400).json({
-                    message: 'Validation failed',
-                    errors: error.errors
-                });
-            }
-            throw error;
-        }
+const normalizePaymentTerms = (term?: string) => {
+  const t = (term || "").toLowerCase().replace(/\s+/g, "");
+  switch (t) {
+    case "net7":
+    case "net-7":
+      return "net7" as const;
+    case "net15":
+    case "net-15":
+      return "net15" as const;
+    case "net30":
+    case "net-30":
+      return "net30" as const;
+    case "net60":
+    case "net-60":
+      return "net60" as const;
+    case "dueonreceipt":
+    case "dueonreceipts":
+    case "dueonreceip":
+      return "dueOnReceipt" as const;
+    default:
+      return null;
+  }
+};
 
-        // Verify customer exists
-        const customer = await Customer.findById(validatedData.customer_id);
-        if (!customer) {
-            return res.status(404).json({ 
-                message: 'Customer not found',
-                errors: [{ field: 'customer_id', message: 'Customer with this ID does not exist' }]
-            });
-        }
+const addDays = (date: Date, days: number) => {
+  const d = new Date(date);
+  d.setDate(d.getDate() + days);
+  return d;
+};
 
-        // Verify all products exist
-        const productIds = validatedData.items.map(item => new mongoose.Types.ObjectId(item.product_id));
-        const products = await Product.find({ _id: { $in: productIds } });
-        
-        if (products.length !== validatedData.items.length) {
-            const foundIds = products.map(p => p._id.toString());
-            const missingIds = validatedData.items
-                .filter(item => !foundIds.includes(item.product_id))
-                .map(item => item.product_id);
-            
-            return res.status(404).json({
-                message: 'One or more products not found',
-                errors: [{ 
-                    field: 'items', 
-                    message: `Products with IDs ${missingIds.join(', ')} do not exist` 
-                }]
-            });
-        }
+const generateInvoiceNumber = async (): Promise<string> => {
+  let attempts = 0;
+  while (attempts < 5) {
+    const raw = randomUUID().replace(/-/g, "").slice(0, 8).toUpperCase();
+    const invoiceNumber = `INV-${raw.slice(0, 4)}-${raw.slice(4, 8)}`;
+    const exists = await Invoice.findOne({ invoiceNumber }).lean();
+    if (!exists) {
+      return invoiceNumber;
+    }
+    attempts += 1;
+  }
+  throw new Error("Unable to generate unique invoice number");
+};
 
-        // Calculate due date from payment terms
-        const invoiceDate = new Date();
-        const dueDate = calculateDueDate(validatedData.paymentTerms, invoiceDate);
+const INVOICE_LIST_CACHE_KEY = "invoices:all";
+const INVOICE_CACHE_PREFIX = "invoices:";
+const INVOICE_CACHE_TTL_SECONDS = 300;
 
-        // Prepare invoice data
-        const invoiceData: any = {
-            customer_id: new mongoose.Types.ObjectId(validatedData.customer_id),
-            items: validatedData.items.map(item => ({
-                product_id: new mongoose.Types.ObjectId(item.product_id),
-                quantity: item.quantity,
-                unit_price: item.unit_price
-            })),
-            tax_type: validatedData.tax_type,
-            tax_value: validatedData.tax_value,
-            discount_type: validatedData.discount_type,
-            discount_value: validatedData.discount_value,
-            paymentTerms: validatedData.paymentTerms,
-            due_date: dueDate,
-            deposit_received: validatedData.deposit_received || 0,
-            notes: validatedData.notes || '',
-            signature: validatedData.signature,
-            sales_rep_id: new mongoose.Types.ObjectId(validatedData.sales_rep_id),
-            status: 'Pending' as const
+const runCacheOps = async (ops: Promise<unknown>[]) => {
+  if (!ops.length) return;
+  try {
+    await Promise.all(ops);
+  } catch (err) {
+    console.error("Redis cache error:", err);
+  }
+};
+
+const invalidateInvoiceListCaches = async (cacheClient: any) => {
+  try {
+    const keys: string[] = [];
+    for await (const key of cacheClient.scanIterator({ MATCH: `${INVOICE_LIST_CACHE_KEY}:*` })) {
+      keys.push(key as string);
+    }
+    // Also include the legacy/all key
+    keys.push(INVOICE_LIST_CACHE_KEY);
+    if (keys.length) {
+      await cacheClient.del(...keys);
+    }
+  } catch (err) {
+    console.error("Redis cache error (invalidate invoice lists):", err);
+  }
+};
+
+/**
+ * Calculate total spent by a customer (sum of all deposits from all their payments)
+ */
+const calculateCustomerTotalSpent = async (customerId: Types.ObjectId): Promise<number> => {
+  try {
+    // Sum all deposits from the deposits array for this customer
+    const result = await Payment.aggregate([
+      { $match: { customerId } },
+      { $unwind: "$deposits" },
+      { $group: { _id: null, total: { $sum: "$deposits.amount" } } },
+    ]);
+    // Fallback to amount field if no deposits array (for backward compatibility)
+    if (result.length === 0) {
+      const fallbackResult = await Payment.aggregate([
+        { $match: { customerId } },
+        { $group: { _id: null, total: { $sum: "$amount" } } },
+      ]);
+      return fallbackResult.length > 0 ? Number(fallbackResult[0].total.toFixed(2)) : 0;
+    }
+    return Number(result[0].total.toFixed(2));
+  } catch (error) {
+    console.error("Error calculating customer total spent:", error);
+    return 0;
+  }
+};
+
+/**
+ * Create or update a payment record for an invoice deposit
+ * 
+ * Rules:
+ * - CREATE: Different customer (new payment record)
+ * - UPDATE: Same customer (regardless of invoice) - update existing payment record
+ *   - Add invoiceId to invoiceIds array if not already present
+ *   - Increment amount and depositCount
+ * 
+ * Returns the payment ID (existing or newly created)
+ */
+const createOrUpdatePaymentRecord = async (
+  customerId: Types.ObjectId,
+  invoiceId: Types.ObjectId,
+  amount: number,
+  recordedBy?: Types.ObjectId,
+  paymentMethod: "cash" | "card" | "bank_transfer" | "cheque" | "other" = "cash"
+): Promise<Types.ObjectId | null> => {
+  try {
+    // Check if a payment already exists for this customer (one payment record per customer)
+    const existingPayment = await Payment.findOne({
+      customerId,
+    }).lean();
+
+    let paymentId: Types.ObjectId;
+
+    if (existingPayment) {
+      // UPDATE: Same customer - update existing payment
+      paymentId = existingPayment._id as Types.ObjectId;
+      
+      // Check if invoiceId is already in the invoiceIds array
+      const invoiceIdString = invoiceId.toString();
+      const invoiceIds = existingPayment.invoiceIds || [];
+      const invoiceIdExists = invoiceIds.some(
+        (id: Types.ObjectId) => id.toString() === invoiceIdString
+      );
+
+      // Create new deposit record with individual payment method
+      const newDepositRecord = {
+        amount: Number(amount.toFixed(2)),
+        paymentMethod,
+        invoiceId,
+        date: new Date(),
+        recordedBy,
+      };
+
+      // Calculate new cumulative amount (sum of all deposits including new one)
+      // Handle both new structure (deposits array) and legacy structure (amount field)
+      const existingDeposits = existingPayment.deposits || [];
+      let existingTotal = 0;
+      
+      if (existingDeposits.length > 0) {
+        // New structure: sum from deposits array
+        existingTotal = existingDeposits.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+      } else {
+        // Legacy structure: use amount field
+        existingTotal = Number(existingPayment.amount || 0);
+      }
+      
+      const newAmount = Number((existingTotal + amount).toFixed(2));
+      const newDepositCount = Math.max(existingDeposits.length, existingPayment.depositCount || 0) + 1;
+
+      // Recalculate total spent by customer
+      const currentTotalSpent = await calculateCustomerTotalSpent(customerId);
+      const oldAmount = existingPayment.amount;
+      const newTotalSpent = Number((currentTotalSpent - oldAmount + newAmount).toFixed(2));
+
+      // Build update query with $push, $set, and optionally $addToSet
+      const updateQuery: any = {
+        $push: {
+          deposits: newDepositRecord, // Add new deposit record to array
+        },
+        $set: {
+          amount: newAmount, // Cumulative total
+          totalSpent: newTotalSpent,
+          depositCount: newDepositCount,
+          paymentDate: new Date(), // Latest deposit date
+          paymentMethod, // Latest payment method (for backward compatibility)
+          ...(recordedBy && { recordedBy }), // Latest recordedBy
+        },
+      };
+
+      // Add invoiceId to array if not already present
+      if (!invoiceIdExists) {
+        updateQuery.$addToSet = {
+          invoiceIds: invoiceId,
         };
+      }
 
-        // Add estimate_id if provided
-        if (validatedData.estimate_id) {
-            invoiceData.estimate_id = new mongoose.Types.ObjectId(validatedData.estimate_id);
-        }
+      await Payment.findByIdAndUpdate(existingPayment._id, updateQuery);
 
-        // Create new invoice (reference number and totals will be auto-generated by pre-save hook)
-        const newInvoice = new Invoice(invoiceData);
-        await newInvoice.save();
+      // Update all invoices in the payment's invoiceIds array with the paymentId
+      // Fetch updated payment to get the complete invoiceIds array (including newly added one)
+      const updatedPayment = await Payment.findById(existingPayment._id).lean();
+      const allInvoiceIds = updatedPayment?.invoiceIds || [];
+      
+      // Always include current invoiceId to ensure it's updated
+      const invoiceIdsToUpdate = [
+        ...allInvoiceIds,
+        invoiceId, // Current invoice (will be deduplicated by updateMany)
+      ];
+      
+      if (invoiceIdsToUpdate.length > 0) {
+        await Invoice.updateMany(
+          { _id: { $in: invoiceIdsToUpdate } },
+          { $set: { paymentId } }
+        );
+      }
+    } else {
+      // CREATE: No existing payment for this customer - create new payment record
+      // Calculate total spent by customer (before adding this payment)
+      const totalSpent = await calculateCustomerTotalSpent(customerId);
+      const newTotalSpent = Number((totalSpent + amount).toFixed(2));
 
-        // Populate references for response
-        await newInvoice.populate('customer_id', 'customerName customerEmail customerPhone customerBillingAddress');
-        await newInvoice.populate('items.product_id', 'product_name product_code description pricing_inventory');
+      // First deposit for this customer
+      const depositCount = 1;
 
-        return res.status(201).json({
-            message: 'Invoice created successfully',
-            invoice: {
-                id: newInvoice._id,
-                invoiceReference: newInvoice.invoiceReference,
-                customer_id: newInvoice.customer_id,
-                items: newInvoice.items,
-                subtotal: newInvoice.subtotal,
-                tax_type: newInvoice.tax_type,
-                tax_value: newInvoice.tax_value,
-                discount_type: newInvoice.discount_type,
-                discount_value: newInvoice.discount_value,
-                total: newInvoice.total,
-                balance: newInvoice.balance,
-                total_paid: newInvoice.total_paid,
-                due_payment: newInvoice.due_payment,
-                deposit_received: newInvoice.deposit_received,
-                status: newInvoice.status,
-                paymentTerms: newInvoice.paymentTerms,
-                due_date: newInvoice.due_date,
-                notes: newInvoice.notes,
-                signature: newInvoice.signature,
-                sales_rep_id: newInvoice.sales_rep_id,
-                estimate_id: newInvoice.estimate_id,
-                createdAt: newInvoice.createdAt,
-                updatedAt: newInvoice.updatedAt
-            }
-        });
-    } catch (error) {
-        if (error instanceof ValidationError) {
-            return res.status(400).json({
-                message: 'Validation failed',
-                errors: error.errors
-            });
-        }
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return res.status(500).json({ 
-            message: 'Error creating invoice', 
-            error: errorMessage
-        });
+      // Create first deposit record
+      const firstDepositRecord = {
+        amount: Number(amount.toFixed(2)),
+        paymentMethod,
+        invoiceId,
+        date: new Date(),
+        recordedBy,
+      };
+
+      // Create new payment record with deposits array
+      const newPayment = await Payment.create({
+        customerId,
+        invoiceIds: [invoiceId], // Array with single invoice
+        deposits: [firstDepositRecord], // Array with first deposit record
+        amount, // Cumulative total (same as first deposit for now)
+        totalSpent: newTotalSpent,
+        depositCount,
+        paymentMethod, // Latest payment method (for backward compatibility)
+        recordedBy, // Latest recordedBy
+        paymentDate: new Date(), // Latest deposit date
+      });
+
+      paymentId = newPayment._id as Types.ObjectId;
+
+      // Update customer with paymentId (first time payment is created)
+      await Customer.findByIdAndUpdate(customerId, {
+        $set: { paymentId },
+      });
+
+      // Update the invoice with paymentId
+      await Invoice.findByIdAndUpdate(invoiceId, {
+        $set: { paymentId },
+      });
     }
-}
 
-export const deleteInvoice = async (_req:Request, res:Response) => {
-    return res.status(200).json({ message: 'Invoice deleted successfully' });
-}
-
-export const updateInvoice = async (_req:Request, res:Response) => {
-    return res.status(200).json({ message: 'Invoice updated successfully' });
-}
-
-export const getInvoices = async (_req: Request, res: Response) => {
-    try {
-        const invoices = await Invoice.find()
-            .populate('customer_id', 'customerName customerEmail customerPhone customerBillingAddress')
-            .populate('items.product_id', 'product_name product_code description pricing_inventory')
-            .populate('sales_rep_id', 'name email')
-            .sort({ createdAt: -1 }); // Sort by newest first
-        
-        return res.status(200).json({ 
-            message: 'Invoices fetched successfully', 
-            invoices,
-            length: invoices.length 
-        });
-    } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return res.status(500).json({ 
-            message: 'Error fetching invoices', 
-            error: errorMessage 
-        });
-    }
-}
-
-export const getInvoiceById = async (req: Request, res: Response) => {
-    try {
-        const { id } = req.params;
-        
-        // Validate MongoDB ObjectId format
-        try {
-            validateMongoId(id);
-        } catch (error) {
-            if (error instanceof ValidationError) {
-                return res.status(400).json({ 
-                    message: 'Invalid invoice ID',
-                    errors: [{ field: 'id', message: error.errors[0].message }]
-                });
-            }
-            throw error;
-        }
-        
-        // Find invoice and populate related data
-        const invoice = await Invoice.findById(id)
-            .populate('customer_id', 'customerName customerEmail customerPhone customerBillingAddress')
-            .populate('items.product_id', 'product_name product_code description pricing_inventory')
-            .populate('sales_rep_id', 'name email')
-            .populate('estimate_id', 'estimateReference status');
-        
-        if (!invoice) {
-            return res.status(404).json({ 
-                message: 'Invoice not found',
-                errors: [{ field: 'id', message: 'Invoice with this ID does not exist' }]
-            });
-        }
-        
-        return res.status(200).json({ 
-            message: 'Invoice fetched successfully', 
-            invoice 
-        });
-    } catch (error) {
-        if (error instanceof ValidationError) {
-            return res.status(400).json({
-                message: 'Validation failed',
-                errors: error.errors
-            });
-        }
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return res.status(500).json({ 
-            message: 'Error fetching invoice', 
-            error: errorMessage 
-        });
-    }
-}
-
-/**
- * Valid status transitions map
- * Key: current status, Value: array of allowed next statuses
- */
-const validInvoiceStatusTransitions: Record<string, string[]> = {
-    'Pending': ['Paid', 'Partially Paid', 'Overdue', 'Cancelled'],
-    'Partially Paid': ['Paid', 'Partially Paid', 'Overdue', 'Cancelled'],
-    'Overdue': ['Paid', 'Partially Paid', 'Cancelled'],
-    'Paid': [], // Final status - no transitions allowed
-    'Cancelled': [] // Final status - no transitions allowed
+    return paymentId;
+  } catch (error) {
+    console.error("Error creating/updating payment record:", error);
+    // Don't throw - payment creation/update failure shouldn't break invoice creation/update
+    // But log it for investigation
+    return null;
+  }
 };
 
-/**
- * Check if status transition is valid
- */
-const isValidInvoiceStatusTransition = (currentStatus: string, newStatus: string): boolean => {
-    // Same status is always valid (idempotent)
-    if (currentStatus === newStatus) {
-        return true;
+const createInvoice = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
     }
-    
-    // Check if transition is allowed
-    const allowedTransitions = validInvoiceStatusTransitions[currentStatus] || [];
-    return allowedTransitions.includes(newStatus);
+
+    const {
+      customerId,
+      salesRepId,
+      items,
+      message,
+      signature,
+      paymentTerms,
+      depositReceived = 0,
+    } = req.body || {};
+    const estimateReference =
+      typeof req.query?.estimateReference === "string"
+        ? req.query.estimateReference.trim()
+        : "";
+
+    if (estimateReference) {
+      const existingInvoice = await Invoice.findOne({ estimateReference }).lean();
+      if (existingInvoice) {
+        return res.status(409).json({
+          message: "Invoice already exists for this estimate reference",
+        });
+      }
+    }
+
+    if (!customerId || !Types.ObjectId.isValid(customerId)) {
+      return res.status(400).json({ message: "Valid customerId is required" });
+    }
+
+    const customer = await Customer.findById(new Types.ObjectId(customerId)).lean();
+    if (!customer) {
+      return res.status(404).json({ message: "Customer not found" });
+    }
+
+    if (!salesRepId || !Types.ObjectId.isValid(salesRepId)) {
+      return res.status(400).json({ message: "Valid salesRepId is required" });
+    }
+    const salesRep = await User.findById(new Types.ObjectId(salesRepId)).lean();
+    if (!salesRep) {
+      return res.status(404).json({ message: "Sales representative not found" });
+    }
+    const salesRepRole = await Role.findOne({ name: "Sales Representative" }).lean();
+    if (!salesRepRole) {
+      return res.status(500).json({ message: "Sales representative role not configured" });
+    }
+    const hasSalesRepRole = Array.isArray(salesRep.roleIds)
+      && salesRep.roleIds.some((rid: any) => rid?.toString() === salesRepRole._id.toString());
+    if (!hasSalesRepRole) {
+      return res.status(403).json({ message: "User is not a Sales Representative" });
+    }
+    const salesRepObjectId = salesRep._id as Types.ObjectId;
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "At least one item is required" });
+    }
+
+    // Normalize and validate all items using the shared utility
+    const normalizedItems: InvoiceItem[] = [];
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx] as IncomingItem;
+      const normalized = normalizeAndValidateItem(item, idx);
+      normalizedItems.push(normalized);
+    }
+
+    const deposit = Number(depositReceived ?? 0);
+    if (!Number.isFinite(deposit) || deposit < 0) {
+      return res.status(400).json({ message: "depositReceived must be a non-negative number" });
+    }
+
+    const term = normalizePaymentTerms(paymentTerms);
+    if (!term) {
+      return res.status(400).json({ message: "Invalid paymentTerms" });
+    }
+
+    const issuedAt = new Date();
+    const dueDate =
+      term === "dueOnReceipt"
+        ? issuedAt
+        : term === "net7"
+        ? addDays(issuedAt, 7)
+        : term === "net15"
+        ? addDays(issuedAt, 15)
+        : term === "net30"
+        ? addDays(issuedAt, 30)
+        : addDays(issuedAt, 60);
+
+    // Use the shared calculation utility - this is the SINGLE SOURCE OF TRUTH
+    // Invoice total ALWAYS includes tax (subtotal + 12.5% VAT)
+    const calculated = calculateInvoice({
+      items: normalizedItems,
+      depositReceived: deposit,
+    });
+
+    const invoiceNumber = await generateInvoiceNumber();
+
+    // Get estimate ID if converting from estimate
+    let convertedFromEstimateId: Types.ObjectId | undefined = undefined;
+    if (estimateReference) {
+      try {
+        const estimate = await Estimate.findOne({ reference: estimateReference }).lean();
+        if (estimate) {
+          convertedFromEstimateId = estimate._id as Types.ObjectId;
+        }
+      } catch (err) {
+        console.error("Failed to find estimate for convertedFromEstimate:", err);
+      }
+    }
+
+    const invoice = await Invoice.create({
+      invoiceNumber,
+      customerId: new Types.ObjectId(customerId),
+      salesRep: salesRepObjectId,
+      items: normalizedItems,
+      message: (message || "").trim() || undefined,
+      signature: (signature || "").trim() || undefined,
+      estimateReference: estimateReference || undefined,
+      convertedFromEstimate: convertedFromEstimateId,
+      paymentTerms: term,
+      depositReceived: calculated.depositReceived,
+      status: calculated.status,
+      total: calculated.total,
+      due: calculated.due,
+      balanceDue: calculated.balanceDue,
+      issuedAt,
+      dueDate,
+    });
+
+    // Create the initial invoice edit record (for audit trail - first time invoice is generated)
+    const initialDepositAdded = calculated.depositReceived; // For initial creation, depositAdded equals total deposit
+    const paymentMethod = (req.body.paymentMethod as any) || "cash";
+    const invoiceEdit = await InvoiceEdit.create({
+      invoiceReference: invoiceNumber,
+      baseInvoiceId: invoice._id as Types.ObjectId,
+      previousVersionId: invoice._id as Types.ObjectId, // First version references itself
+      previousVersionSource: "invoice", // Coming from base invoice
+      customerId: new Types.ObjectId(customerId),
+      salesRep: salesRepObjectId,
+      items: normalizedItems,
+      message: (message || "").trim() || undefined,
+      signature: (signature || "").trim() || undefined,
+      estimateReference: estimateReference || undefined,
+      convertedFromEstimate: convertedFromEstimateId,
+      paymentTerms: term,
+      depositReceived: calculated.depositReceived,
+      depositAdded: initialDepositAdded,
+      paymentMethod: calculated.depositReceived > 0 ? paymentMethod : undefined,
+      balanceAfterEdit: calculated.balanceDue,
+      status: calculated.status,
+      total: calculated.total,
+      due: calculated.due,
+      balanceDue: calculated.balanceDue,
+      issuedAt,
+      dueDate,
+    });
+
+    // Update the invoice with the edit reference
+    await Invoice.findByIdAndUpdate(invoice._id, {
+      $push: { editIds: invoiceEdit._id },
+      $inc: { editCount: 1 },
+    });
+
+    // Create or update payment record if deposit was received
+    if (calculated.depositReceived > 0) {
+      const recordedBy = req.user?.userId && Types.ObjectId.isValid(req.user.userId)
+        ? new Types.ObjectId(req.user.userId)
+        : undefined;
+      await createOrUpdatePaymentRecord(
+        new Types.ObjectId(customerId),
+        invoice._id as Types.ObjectId,
+        calculated.depositReceived,
+        recordedBy,
+        (req.body.paymentMethod as any) || "cash"
+      );
+    }
+
+    if (estimateReference) {
+      try {
+        await Estimate.findOneAndUpdate(
+          { reference: estimateReference },
+          { status: "converted" }
+        );
+      } catch (err) {
+        console.error("Failed to update estimate status:", err);
+      }
+    }
+
+    const cacheClient = await getRedisClient();
+    if (cacheClient) {
+      const invoiceKey = `${INVOICE_CACHE_PREFIX}${invoice._id.toString()}`;
+      await runCacheOps([
+        cacheClient.setEx(invoiceKey, INVOICE_CACHE_TTL_SECONDS, JSON.stringify(invoice)),
+        invalidateInvoiceListCaches(cacheClient),
+      ]);
+    }
+
+    return res.status(201).json({
+      message: "Invoice created successfully",
+      invoice: {
+        ...invoice.toObject(),
+        // Include calculated values for clarity
+        subtotal: calculated.subtotal,
+        tax: calculated.tax,
+      },
+    });
+  } catch (error: any) {
+    console.error("Create invoice error:", error);
+    return res.status(500).json({
+      message: "Error creating invoice",
+      errorMessage: error?.message,
+    });
+  }
 };
 
-export const updateInvoiceStatus = async (req: Request, res: Response) => {
-    try {
-        const {id} = req.params;
-        
-        // Validate MongoDB ObjectId format
-        try {
-            validateMongoId(id);
-        } catch (error) {
-            if (error instanceof ValidationError) {
-                return res.status(400).json({ 
-                    message: 'Invalid invoice ID',
-                    errors: [{ field: 'id', message: error.errors[0].message }]
-                });
+const getInvoices = async (req: AuthRequest, res: Response) => {
+  try {
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const cacheKey = `${INVOICE_LIST_CACHE_KEY}:${offset}:${limit}`;
+    let totalOverride: number | null = null;
+
+    const cacheClient = await getRedisClient();
+    if (cacheClient) {
+      try {
+        const cached = await cacheClient.get(cacheKey);
+        if (cached) {
+          const parsed = JSON.parse(cached);
+          const cachedTotal = Number(parsed?.meta?.total ?? 0);
+          if (offset === 0) {
+            const currentTotal = await Invoice.countDocuments({});
+            if (currentTotal === cachedTotal) {
+              return res.status(200).json({
+                message: "Invoices fetched successfully",
+                ...parsed,
+              });
             }
-            throw error;
-        }
-
-        // Validate status update data
-        let validatedData;
-        try {
-            validatedData = validateData(invoiceStatusSchema, req.body);
-        } catch (error) {
-            if (error instanceof ValidationError) {
-                return res.status(400).json({
-                    message: 'Validation failed',
-                    errors: error.errors
-                });
-            }
-            throw error;
-        }
-
-        // Find invoice
-        const invoice = await Invoice.findById(id);
-        if (!invoice) {
-            return res.status(404).json({ 
-                message: 'Invoice not found',
-                errors: [{ field: 'id', message: 'Invoice with this ID does not exist' }]
-            });
-        }
-
-        const currentStatus = invoice.status;
-        const newStatus = validatedData.status;
-
-        console.log(currentStatus, newStatus);
-
-        // Check if status is already the same (idempotent operation)
-        if (currentStatus === newStatus && newStatus !== 'Partially Paid') {
-            // Populate for response
-            await invoice.populate('customer_id', 'customerName customerEmail customerPhone customerBillingAddress');
-            await invoice.populate('items.product_id', 'product_name product_code description pricing_inventory');
-            
+            totalOverride = currentTotal;
+          } else {
             return res.status(200).json({
-                message: 'Invoice status is already set to this value',
-                invoice: {
-                    id: invoice._id,
-                    invoiceReference: invoice.invoiceReference,
-                    status: invoice.status,
-                    previousStatus: currentStatus,
-                    statusChanged: false,
-                    total: invoice.total,
-                    total_paid: invoice.total_paid,
-                    due_payment: invoice.due_payment
-                }
+              message: "Invoices fetched successfully",
+              ...parsed,
             });
+          }
         }
-
-        // Check if current status is a final status (Paid, Cancelled)
-        if (['Paid', 'Cancelled'].includes(currentStatus)) {
-            return res.status(400).json({
-                message: 'Cannot change status of finalized invoice',
-                errors: [{
-                    field: 'status',
-                    message: `Invoice is already ${currentStatus}. Status cannot be changed from final states (Paid, Cancelled).`
-                }],
-                invoice: {
-                    id: invoice._id,
-                    invoiceReference: invoice.invoiceReference,
-                    currentStatus: currentStatus
-                }
-            });
-        }
-
-        // Check if status transition is valid
-        if (!isValidInvoiceStatusTransition(currentStatus, newStatus)) {
-            return res.status(400).json({
-                message: 'Invalid status transition',
-                errors: [{
-                    field: 'status',
-                    message: `Cannot change status from '${currentStatus}' to '${newStatus}'. Allowed transitions from '${currentStatus}': ${validInvoiceStatusTransitions[currentStatus]?.join(', ') || 'none'}`
-                }],
-                invoice: {
-                    id: invoice._id,
-                    invoiceReference: invoice.invoiceReference,
-                    currentStatus: currentStatus,
-                    requestedStatus: newStatus
-                }
-            });
-        }
-
-        // Handle Partially Paid status
-        if (newStatus === 'Partially Paid') {
-            const paymentAmount = validatedData.payment_amount;
-            
-            if (!paymentAmount || paymentAmount <= 0) {
-                return res.status(400).json({
-                    message: 'Payment amount is required for Partially Paid status',
-                    errors: [{
-                        field: 'payment_amount',
-                        message: 'Payment amount must be greater than 0'
-                    }]
-                });
-            }
-
-            // Check if payment amount exceeds remaining balance
-            const currentBalance = invoice.balance || invoice.total - (invoice.total_paid || 0);
-            if (paymentAmount > currentBalance) {
-                return res.status(400).json({
-                    message: 'Payment amount exceeds remaining balance',
-                    errors: [{
-                        field: 'payment_amount',
-                        message: `Payment amount (${paymentAmount}) cannot exceed remaining balance (${currentBalance})`
-                    }],
-                    invoice: {
-                        id: invoice._id,
-                        invoiceReference: invoice.invoiceReference,
-                        total: invoice.total,
-                        total_paid: invoice.total_paid || 0,
-                        balance: currentBalance
-                    }
-                });
-            }
-
-            // Add payment to payments array
-            const newPayment = {
-                amount: paymentAmount,
-                payment_date: new Date(),
-                payment_method: validatedData.payment_method || '',
-                notes: validatedData.payment_notes || ''
-            };
-
-            // Initialize payments array if it doesn't exist
-            if (!invoice.payments) {
-                invoice.payments = [];
-            }
-            invoice.payments.push(newPayment);
-
-            // Calculate new totals
-            invoice.total_paid = invoice.payments.reduce((sum, payment) => sum + payment.amount, 0);
-            invoice.due_payment = Math.max(0, invoice.total - invoice.total_paid);
-            invoice.balance = invoice.due_payment;
-
-            // If fully paid, set status to Paid
-            if (invoice.due_payment === 0) {
-                invoice.status = 'Paid';
-            } else {
-                invoice.status = 'Partially Paid';
-            }
-        } else if (newStatus === 'Paid') {
-            // If setting to Paid, ensure full payment
-            const currentBalance = invoice.balance || invoice.total - (invoice.total_paid || 0);
-            
-            if (currentBalance > 0) {
-                // If there's remaining balance, add it as a payment
-                if (!invoice.payments) {
-                    invoice.payments = [];
-                }
-                
-                const finalPayment = {
-                    amount: currentBalance,
-                    payment_date: new Date(),
-                    payment_method: validatedData.payment_method || '',
-                    notes: validatedData.payment_notes || 'Final payment'
-                };
-                
-                invoice.payments.push(finalPayment);
-                invoice.total_paid = invoice.total;
-                invoice.due_payment = 0;
-                invoice.balance = 0;
-            }
-            
-            invoice.status = 'Paid';
-        } else {
-            // For other statuses (Overdue, Cancelled), just update status
-            invoice.status = newStatus;
-        }
-
-        // Save invoice
-        await invoice.save();
-
-        // Populate references for response
-        await invoice.populate('customer_id', 'customerName customerEmail customerPhone customerBillingAddress');
-        await invoice.populate('items.product_id', 'product_name product_code description pricing_inventory');
-
-        const response: any = {
-            message: 'Invoice status updated successfully',
-            invoice: {
-                id: invoice._id,
-                invoiceReference: invoice.invoiceReference,
-                status: invoice.status,
-                previousStatus: currentStatus,
-                statusChanged: true,
-                total: invoice.total,
-                total_paid: invoice.total_paid,
-                due_payment: invoice.due_payment,
-                balance: invoice.balance,
-                payments: invoice.payments
-            }
-        };
-
-        // Add specific message for Partially Paid
-        if (newStatus === 'Partially Paid') {
-            response.message = 'Invoice status updated to Partially Paid. Payment recorded successfully.';
-            response.payment_details = {
-                payment_amount: validatedData.payment_amount,
-                payment_date: invoice.payments[invoice.payments.length - 1].payment_date,
-                remaining_balance: invoice.due_payment
-            };
-        }
-
-        return res.status(200).json(response);
-    } catch (error) {
-        if (error instanceof ValidationError) {
-            return res.status(400).json({
-                message: 'Validation failed',
-                errors: error.errors
-            });
-        }
-        
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        return res.status(500).json({ 
-            message: 'Error updating invoice status', 
-            error: errorMessage
-        });
+      } catch (err) {
+        console.error("Redis cache read error (invoice list):", err);
+      }
     }
-}
 
+    const [invoices, total] = await Promise.all([
+      Invoice.find({})
+        .sort({ createdAt: -1 })
+        .skip(offset)
+        .limit(limit)
+        .populate("customerId", "name email phone billingAddress shippingAddress")
+        .populate("salesRep", "fullName email")
+        .lean(),
+      totalOverride === null ? Invoice.countDocuments({}) : Promise.resolve(totalOverride),
+    ]);
+
+    // Map invoices ensuring we return the correct values from the base invoice
+    // The base invoice is already updated on each edit, so these values are current
+    const mapped = invoices.map((inv: any) => {
+      const customer = inv.customerId || {};
+      const salesRep = inv.salesRep || {};
+      
+      // The base invoice stores the current total (with tax), balance, and status
+      // These are synced on every update, so they reflect the latest state
+      return {
+        id: inv._id,
+        reference: inv.invoiceNumber,
+        customer: customer.name || customer.email || "",
+        customerId: customer._id || inv.customerId,
+        date: inv.issuedAt,
+        dueDate: inv.dueDate,
+        status: inv.status, // Current status (derived from balance)
+        salesRep: salesRep.fullName || salesRep.email || "",
+        total: inv.total, // Invoice total WITH tax
+        balance: inv.balanceDue, // Current balance (can be negative if overpaid)
+        depositReceived: inv.depositReceived, // Total deposit received
+      };
+    });
+
+    if (cacheClient) {
+      await runCacheOps([
+        cacheClient.setEx(
+          cacheKey,
+          INVOICE_CACHE_TTL_SECONDS,
+          JSON.stringify({
+            invoices: mapped,
+            meta: {
+              total,
+              limit,
+              offset,
+              hasMore: offset + limit < total,
+            },
+          })
+        ),
+      ]);
+    }
+
+    return res.status(200).json({
+      message: "Invoices fetched successfully",
+      invoices: mapped,
+      meta: {
+        total,
+        limit,
+        offset,
+        hasMore: offset + limit < total,
+      },
+    });
+  } catch (error: any) {
+    console.error("Get invoices error:", error);
+    return res.status(500).json({
+      message: "Error fetching invoices",
+      errorMessage: error?.message,
+    });
+  }
+};
+
+const getInvoiceById = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid invoice id" });
+    }
+
+    // Note: We skip cache for now to ensure fresh data consistency
+    // The base invoice is already updated on each edit, so we can just read it
+
+    const invoice = await Invoice.findById(new Types.ObjectId(id))
+      .populate("customerId", "name email phone billingAddress shippingAddress")
+      .populate("salesRep", "fullName email")
+      .lean();
+
+    if (!invoice) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    // The base invoice should already reflect the latest state (synced on update)
+    // But we recalculate to ensure consistency
+    const items = (invoice.items || []).map((item: any) => ({
+      productCode: item.productCode || "",
+      description: item.description || "",
+      quantity: Number(item.quantity ?? 0),
+      discount: Number(item.discount ?? 0),
+      amount: Number(item.amount ?? 0),
+    }));
+
+    // Recalculate using the shared utility to ensure values are correct
+    const calculated = calculateInvoice({
+      items,
+      depositReceived: Number(invoice.depositReceived ?? 0),
+    });
+
+    const customerData = invoice.customerId as any;
+    const salesRepData = invoice.salesRep as any;
+
+    const responseInvoice = {
+      invoiceId: invoice._id,
+      invoiceReferenceNumber: invoice.invoiceNumber,
+      customerId: customerData?._id || invoice.customerId,
+      customerName: customerData?.name || customerData?.email || "",
+      customerEmail: customerData?.email || "",
+      customerPhone: customerData?.phone || "",
+      customerBillingAddress: customerData?.billingAddress || "",
+      customerShippingAddress: customerData?.shippingAddress || "",
+      salesRepId: salesRepData?._id || invoice.salesRep,
+      salesRepName: salesRepData?.fullName || salesRepData?.email || "",
+      productDetails: items,
+      message: invoice.message,
+      signature: invoice.signature,
+      paymentTerms: invoice.paymentTerms,
+      estimateReference: invoice.estimateReference,
+      issuedAt: invoice.issuedAt,
+      dueDate: invoice.dueDate,
+      // Core financial values from calculation (source of truth)
+      subtotal: calculated.subtotal,
+      tax: calculated.tax,
+      total: calculated.total,
+      depositReceived: calculated.depositReceived,
+      totalDepositReceived: calculated.depositReceived,
+      balanceDue: calculated.balanceDue,
+      due: calculated.due,
+      status: calculated.status,
+      // Edit tracking
+      editCount: invoice.editCount || 0,
+    };
+
+    const cacheClient = await getRedisClient();
+    if (cacheClient) {
+      const invoiceKey = `${INVOICE_CACHE_PREFIX}${id}`;
+      await runCacheOps([
+        cacheClient.setEx(
+          invoiceKey,
+          INVOICE_CACHE_TTL_SECONDS,
+          JSON.stringify(responseInvoice)
+        ),
+      ]);
+    }
+
+    return res.status(200).json({
+      message: "Invoice fetched successfully",
+      invoice: responseInvoice,
+    });
+  } catch (error: any) {
+    console.error("Get invoice error:", error);
+    return res.status(500).json({
+      message: "Error fetching invoice",
+      errorMessage: error?.message,
+    });
+  }
+};
+
+/**
+ * Check if invoice items have changed by comparing current and new items
+ * Returns true if items changed (added, removed, or modified), false if identical
+ */
+const checkIfItemsChanged = (
+  currentItems: InvoiceItem[],
+  newItems: InvoiceItem[]
+): boolean => {
+  // Different number of items means change
+  if (currentItems.length !== newItems.length) {
+    return true;
+  }
+
+  // If no items, consider it unchanged (edge case)
+  if (currentItems.length === 0 && newItems.length === 0) {
+    return false;
+  }
+
+  // Create normalized comparison maps
+  // Use productCode + quantity + discount + amount as composite key to handle duplicates
+  const normalizeItem = (item: InvoiceItem) => {
+    return {
+      productCode: (item.productCode || "").toLowerCase().trim(),
+      quantity: Number(item.quantity || 0),
+      discount: Number(item.discount || 0),
+      amount: Number(item.amount || 0),
+    };
+  };
+
+  const currentNormalized = currentItems.map(normalizeItem).sort((a, b) => {
+    // Sort by productCode for consistent comparison
+    return a.productCode.localeCompare(b.productCode);
+  });
+
+  const newNormalized = newItems.map(normalizeItem).sort((a, b) => {
+    return a.productCode.localeCompare(b.productCode);
+  });
+
+  // Compare each item
+  for (let i = 0; i < currentNormalized.length; i++) {
+    const current = currentNormalized[i];
+    const newItem = newNormalized[i];
+
+    // Compare all fields with tolerance for floating point
+    const productCodeMatch = current.productCode === newItem.productCode;
+    const quantityMatch = Math.abs(current.quantity - newItem.quantity) < 0.01;
+    const discountMatch = Math.abs(current.discount - newItem.discount) < 0.01;
+    const amountMatch = Math.abs(current.amount - newItem.amount) < 0.01;
+
+    if (!productCodeMatch || !quantityMatch || !discountMatch || !amountMatch) {
+      return true; // Items changed
+    }
+  }
+
+  // All items match - no changes
+  return false;
+};
+
+const getInvoiceEdits = async (req: AuthRequest, res: Response) => {
+  try {
+    const { id } = req.params;
+    if (!Types.ObjectId.isValid(id)) {
+      return res.status(400).json({ message: "Invalid invoice id" });
+    }
+
+    const invoice = await Invoice.findById(new Types.ObjectId(id))
+      .populate("customerId", "name email phone billingAddress shippingAddress")
+      .populate("salesRep", "fullName email")
+      .lean();
+
+    if (!invoice) {
+      return res.status(404).json({ message: "Invoice not found" });
+    }
+
+    const edits = await InvoiceEdit.find({ baseInvoiceId: invoice._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.status(200).json({
+      message: "Invoice edits fetched successfully",
+      invoice,
+      edits,
+    });
+  } catch (error: any) {
+    console.error("Get invoice edits error:", error);
+    return res.status(500).json({
+      message: "Error fetching invoice edits",
+      errorMessage: error?.message,
+    });
+  }
+};
+
+const updateInvoice = async (req: AuthRequest, res: Response) => {
+  try {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const { id } = req.params;
+    const invoiceReference =
+      typeof req.body?.invoiceReference === "string"
+        ? req.body.invoiceReference.trim()
+        : typeof req.body?.invoiceNumber === "string"
+        ? req.body.invoiceNumber.trim()
+        : typeof req.body?.reference === "string"
+        ? req.body.reference.trim()
+        : "";
+    const { items, depositReceived = 0 } = req.body || {};
+
+    let baseInvoice: any = null;
+    if (id && Types.ObjectId.isValid(id)) {
+      baseInvoice = await Invoice.findById(new Types.ObjectId(id)).lean();
+    }
+    if (!baseInvoice && invoiceReference) {
+      baseInvoice = await Invoice.findOne({ invoiceNumber: invoiceReference }).lean();
+    }
+    if (!baseInvoice) {
+      return res.status(404).json({ message: "Invoice reference not found" });
+    }
+
+    if (!Array.isArray(items) || items.length === 0) {
+      return res.status(400).json({ message: "At least one item is required" });
+    }
+
+    // Normalize and validate all items using the shared utility
+    const normalizedItems: InvoiceItem[] = [];
+    for (let idx = 0; idx < items.length; idx++) {
+      const item = items[idx] as IncomingItem;
+      const normalized = normalizeAndValidateItem(item, idx);
+      normalizedItems.push(normalized);
+    }
+
+    const newDeposit = Number(depositReceived ?? 0);
+    if (!Number.isFinite(newDeposit) || newDeposit < 0) {
+      return res.status(400).json({ message: "depositReceived must be a non-negative number" });
+    }
+
+    // Get the current state (from latest edit or base invoice)
+    const latestEdit = await InvoiceEdit.findOne({ baseInvoiceId: baseInvoice._id })
+      .sort({ createdAt: -1 })
+      .lean();
+    
+    const previousDeposit = Number(
+      latestEdit?.depositReceived ?? baseInvoice.depositReceived ?? 0
+    );
+
+    // Get current items (from latest edit or base invoice)
+    const currentItems = (latestEdit?.items || baseInvoice.items || []) as InvoiceItem[];
+    
+    // Check if nothing has changed
+    const itemsChanged = checkIfItemsChanged(currentItems, normalizedItems);
+    const depositChanged = Math.abs(newDeposit - previousDeposit) > 0.01; // Allow for floating point precision
+    
+    // If nothing changed, reject the update
+    if (!itemsChanged && !depositChanged) {
+      return res.status(400).json({
+        message: "No changes detected. Invoice items, quantities, prices, discounts, and deposit remain the same. Please make changes before updating.",
+      });
+    }
+    
+    // FIRST: Calculate what the NEW total would be with the NEW items
+    // This is crucial for the deposit rule check - if items increase the total,
+    // the balance may become positive again, allowing deposits
+    const newCalculation = calculateInvoice({
+      items: normalizedItems,
+      depositReceived: previousDeposit, // Use previous deposit first to get the "before new deposit" balance
+    });
+    
+    // The balance BEFORE applying the new deposit (with new items but old deposit)
+    const balanceBeforeNewDeposit = newCalculation.balanceDue;
+    
+    // Check if deposit can be accepted
+    // Key rule: deposits only allowed if balance is positive (partial/pending)
+    // Exception: if items changed and balance becomes positive, deposits become allowed again
+    const depositCheck = canAcceptDeposit(
+      balanceBeforeNewDeposit,
+      newDeposit,
+      previousDeposit
+    );
+    
+    if (!depositCheck.allowed) {
+      return res.status(400).json({
+        message: depositCheck.message || "Deposit not allowed",
+      });
+    }
+    
+    // Now calculate with the new deposit
+    const calculated = calculateInvoice({
+      items: normalizedItems,
+      depositReceived: newDeposit,
+    });
+
+    const depositAdded = Number((newDeposit - previousDeposit).toFixed(2));
+    const paymentMethod = (req.body.paymentMethod as any) || "cash";
+    
+    const previousVersionId =
+      Array.isArray(baseInvoice.editIds) && baseInvoice.editIds.length > 0
+        ? baseInvoice.editIds[baseInvoice.editIds.length - 1]
+        : baseInvoice._id;
+    const previousVersionSource =
+      Array.isArray(baseInvoice.editIds) && baseInvoice.editIds.length > 0 ? "edit" : "invoice";
+
+    // Create the invoice edit record (for audit trail)
+    const invoiceEdit = await InvoiceEdit.create({
+      invoiceReference: invoiceReference || baseInvoice.invoiceNumber,
+      baseInvoiceId: baseInvoice._id,
+      previousVersionId,
+      previousVersionSource,
+      customerId: new Types.ObjectId(baseInvoice.customerId),
+      salesRep: baseInvoice.salesRep ? new Types.ObjectId(baseInvoice.salesRep) : undefined,
+      items: normalizedItems,
+      message: baseInvoice.message,
+      signature: baseInvoice.signature,
+      estimateReference: baseInvoice.estimateReference,
+      convertedFromEstimate: baseInvoice.convertedFromEstimate,
+      paymentTerms: baseInvoice.paymentTerms,
+      depositReceived: calculated.depositReceived,
+      depositAdded,
+      paymentMethod: depositAdded > 0 ? paymentMethod : undefined,
+      balanceAfterEdit: calculated.balanceDue,
+      status: calculated.status,
+      total: calculated.total,
+      due: calculated.due,
+      balanceDue: calculated.balanceDue,
+      issuedAt: baseInvoice.issuedAt ? new Date(baseInvoice.issuedAt) : new Date(),
+      dueDate: baseInvoice.dueDate ? new Date(baseInvoice.dueDate) : undefined,
+    });
+
+    // CRITICAL: Update the BASE invoice to match the latest edit
+    // This ensures list page shows correct current state
+    await Invoice.findByIdAndUpdate(baseInvoice._id, {
+      $push: { editIds: invoiceEdit._id },
+      $inc: { editCount: 1 },
+      $set: {
+        items: normalizedItems,
+        total: calculated.total,
+        balanceDue: calculated.balanceDue,
+        depositReceived: calculated.depositReceived,
+        status: calculated.status,
+        due: calculated.due,
+      },
+    });
+
+    // Create or update payment record if a new deposit was added
+    if (depositAdded > 0) {
+      const recordedBy = req.user?.userId && Types.ObjectId.isValid(req.user.userId)
+        ? new Types.ObjectId(req.user.userId)
+        : undefined;
+      await createOrUpdatePaymentRecord(
+        new Types.ObjectId(baseInvoice.customerId),
+        baseInvoice._id as Types.ObjectId,
+        depositAdded,
+        recordedBy,
+        (req.body.paymentMethod as any) || "cash"
+      );
+    }
+
+    const cacheClient = await getRedisClient();
+    if (cacheClient) {
+      const invoiceKey = `${INVOICE_CACHE_PREFIX}${baseInvoice._id.toString()}`;
+      await runCacheOps([
+        cacheClient.del(invoiceKey),
+        invalidateInvoiceListCaches(cacheClient),
+      ]);
+    }
+
+    return res.status(201).json({
+      message: "Invoice updated successfully",
+      invoiceEdit: {
+        ...invoiceEdit.toObject(),
+        // Include calculated values for clarity
+        subtotal: calculated.subtotal,
+        tax: calculated.tax,
+      },
+    });
+  } catch (error: any) {
+    console.error("Update invoice error:", error);
+    return res.status(500).json({
+      message: "Error updating invoice",
+      errorMessage: error?.message,
+    });
+  }
+};
+
+const deleteInvoice = async (req: AuthRequest, res: Response) => {
+  const { id } = req.params;
+  if (!Types.ObjectId.isValid(id)) {
+    return res.status(400).json({ message: "Invalid invoice id" });
+  }
+
+  const cacheClient = await getRedisClient();
+  if (cacheClient) {
+    await runCacheOps([
+      invalidateInvoiceListCaches(cacheClient),
+      cacheClient.del(`${INVOICE_CACHE_PREFIX}${id}`),
+    ]);
+  }
+
+  return res.status(200).json({
+    message: "Invoice deleted successfully",
+    id: req.params.id,
+  });
+};
+
+export { createInvoice, getInvoices, getInvoiceById, getInvoiceEdits, updateInvoice, deleteInvoice };

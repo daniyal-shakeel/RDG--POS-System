@@ -56,11 +56,11 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
               <Label className="text-xs sm:text-sm">Full Name</Label>
-              <Input defaultValue={user?.name} className="text-sm" />
+              <Input defaultValue={user?.name} className="text-sm pl-4" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs sm:text-sm">Email</Label>
-              <Input defaultValue={user?.email} className="text-sm" />
+              <Input defaultValue={user?.email} className="text-sm pl-4 " />
             </div>
             <div className="space-y-2">
               <Label className="text-xs sm:text-sm">Role</Label>
@@ -69,10 +69,10 @@ export default function SettingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
                   <SelectItem value="admin">Administrator</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="sales_rep">Sales Representative</SelectItem>
-                  <SelectItem value="warehouse">Warehouse Staff</SelectItem>
+                  <SelectItem value="stock_keeper">Stock Keeper</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -88,19 +88,19 @@ export default function SettingsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
             <div className="space-y-2">
               <Label className="text-xs sm:text-sm">Company Name</Label>
-              <Input defaultValue="The XYZ Company Ltd. Ltd." className="text-sm" />
+              <Input defaultValue="The XYZ Company Ltd. Ltd." className="text-sm pl-4" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs sm:text-sm">Phone</Label>
-              <Input defaultValue="+1(868)739-5025" className="text-sm" />
+              <Input defaultValue="+1(868)739-5025" className="text-sm pl-4" />
             </div>
             <div className="space-y-2 sm:col-span-2">
               <Label className="text-xs sm:text-sm">Address</Label>
-              <Input defaultValue="22 Macoya Road West, Macoya Industrial Estate, Tunapuna" className="text-sm" />
+              <Input defaultValue="22 Macoya Road West, Macoya Industrial Estate, Tunapuna" className="text-sm pl-4" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs sm:text-sm">Tax Rate (%)</Label>
-              <Input type="number" defaultValue="12.5" className="text-sm" />
+              <Input type="number" defaultValue="12.5" className="text-sm pl-4" />
             </div>
             <div className="space-y-2">
               <Label className="text-xs sm:text-sm">Currency</Label>

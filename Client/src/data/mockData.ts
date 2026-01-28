@@ -86,111 +86,7 @@ const calculateTotals = (items: LineItem[]) => {
   return { subtotal, discount, tax, total };
 };
 
-export const mockDocuments: SalesDocument[] = [
-  (() => {
-    const items = generateMockLineItems();
-    const totals = calculateTotals(items);
-    return {
-      id: 'DOC001',
-      type: 'invoice' as const,
-      refNumber: 'INV-2025-0001',
-      date: new Date('2025-01-15'),
-      dueDate: new Date('2025-01-30'),
-      terms: 'Net 15',
-      customer: mockCustomers[0],
-      items,
-      ...totals,
-      balanceDue: totals.total,
-      deposit: 0,
-      status: 'pending' as const,
-      salesRep: 'Marcus Johnson',
-      message: 'Thank you for your business!',
-      createdAt: new Date('2025-01-15T10:30:00'),
-      updatedAt: new Date('2025-01-15T10:30:00')
-    };
-  })(),
-  (() => {
-    const items = generateMockLineItems();
-    const totals = calculateTotals(items);
-    return {
-      id: 'DOC002',
-      type: 'receipt' as const,
-      refNumber: 'RCP-2025-0001',
-      date: new Date('2025-01-14'),
-      customer: mockCustomers[1],
-      items,
-      ...totals,
-      balanceDue: 0,
-      deposit: totals.total,
-      status: 'paid' as const,
-      salesRep: 'Alicia Mohammed',
-      signature: 'data:image/png;base64,signature...',
-      createdAt: new Date('2025-01-14T14:20:00'),
-      updatedAt: new Date('2025-01-14T14:25:00')
-    };
-  })(),
-  (() => {
-    const items = generateMockLineItems();
-    const totals = calculateTotals(items);
-    return {
-      id: 'DOC003',
-      type: 'estimate' as const,
-      refNumber: 'EST-2025-0003',
-      date: new Date('2025-01-13'),
-      customer: mockCustomers[2],
-      items,
-      ...totals,
-      balanceDue: totals.total,
-      deposit: 0,
-      status: 'pending' as const,
-      salesRep: 'David Singh',
-      message: 'Valid for 30 days',
-      createdAt: new Date('2025-01-13T09:15:00'),
-      updatedAt: new Date('2025-01-13T09:15:00')
-    };
-  })(),
-  (() => {
-    const items = generateMockLineItems();
-    const totals = calculateTotals(items);
-    return {
-      id: 'DOC004',
-      type: 'credit_note' as const,
-      refNumber: 'CN-2025-0001',
-      date: new Date('2025-01-12'),
-      customer: mockCustomers[0],
-      items,
-      ...totals,
-      balanceDue: 0,
-      deposit: 0,
-      status: 'approved' as const,
-      salesRep: 'Marcus Johnson',
-      message: 'Returned goods - quality issue',
-      createdAt: new Date('2025-01-12T11:00:00'),
-      updatedAt: new Date('2025-01-12T11:30:00')
-    };
-  })(),
-  (() => {
-    const items = generateMockLineItems();
-    const totals = calculateTotals(items);
-    return {
-      id: 'DOC005',
-      type: 'invoice' as const,
-      refNumber: 'INV-2025-0002',
-      date: new Date('2025-01-10'),
-      dueDate: new Date('2025-01-25'),
-      terms: 'Net 15',
-      customer: mockCustomers[3],
-      items,
-      ...totals,
-      balanceDue: totals.total * 0.5,
-      deposit: totals.total * 0.5,
-      status: 'partial' as const,
-      salesRep: 'Keisha Williams',
-      createdAt: new Date('2025-01-10T16:45:00'),
-      updatedAt: new Date('2025-01-12T10:00:00')
-    };
-  })()
-];
+export const mockDocuments: SalesDocument[] = [];
 
 export const mockUser: User = {
   id: 'U001',
@@ -205,7 +101,6 @@ export const mockStats: SalesStats = {
   weekSales: 28450.00,
   monthSales: 125890.50,
   pendingInvoices: 12,
-  overdueAmount: 3420.00,
   documentsToday: 8
 };
 

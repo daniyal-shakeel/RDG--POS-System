@@ -1,5 +1,4 @@
 import { MainLayout } from '@/components/layout/MainLayout';
-import { usePOS } from '@/contexts/POSContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -11,13 +10,83 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Plus, Search, Mail, Phone, MapPin } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { api } from '@/services/api';
+import { Customer } from '@/types/pos';
+import { toast } from 'sonner';
+import { usePermissions } from '@/hooks/usePermissions';
+
+interface IAddress {
+  street?: string;
+  city?: string;
+  state?: string;
+  postalCode?: string;
+  country?: string;
+}
+
+interface BackendCustomer {
+  _id: string;
+  customerCode?: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  billingAddress?: IAddress;
+  shippingAddress?: IAddress;
+}
+
+// Helper function to format address object to string
+const formatAddress = (address?: IAddress): string => {
+  if (!address) return 'N/A';
+  
+  const parts = [
+    address.street,
+    address.city,
+    address.state,
+    address.postalCode,
+    address.country,
+  ].filter(Boolean);
+  
+  return parts.length > 0 ? parts.join(', ') : 'N/A';
+};
 
 export default function CustomersPage() {
-  const { customers } = usePOS();
+  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const navigate = useNavigate();
+  const { hasPermission } = usePermissions();
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        setIsLoading(true);
+        const response = await api.get('/api/v1/customer');
+        const backendCustomers: BackendCustomer[] = response.data.customers || [];
+        
+        // Transform backend data to frontend Customer type
+        const transformedCustomers: Customer[] = backendCustomers.map((customer) => ({
+          id: customer._id,
+          name: customer.name,
+          email: customer.email || '',
+          phone: customer.phone || '',
+          billingAddress: formatAddress(customer.billingAddress),
+          shippingAddress: formatAddress(customer.shippingAddress || customer.billingAddress),
+        }));
+        
+        setCustomers(transformedCustomers);
+      } catch (error: any) {
+        console.error('Error fetching customers:', error);
+        const errorMessage = error.response?.data?.message || error.message || 'Failed to fetch customers';
+        toast.error(errorMessage);
+        setCustomers([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchCustomers();
+  }, []);
 
   const filteredCustomers = customers.filter(customer =>
     customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -35,13 +104,15 @@ export default function CustomersPage() {
               Manage your customer database
             </p>
           </div>
-          <Button 
-            className="gap-2 w-full sm:w-auto text-xs sm:text-sm"
-            onClick={() => navigate('/customers/new')}
-          >
-            <Plus className="h-4 w-4" />
-            New Customer
-          </Button>
+          {hasPermission('customer.create') && (
+            <Button 
+              className="gap-2 w-full sm:w-auto text-xs sm:text-sm"
+              onClick={() => navigate('/customers/new')}
+            >
+              <Plus className="h-4 w-4" />
+              New Customer
+            </Button>
+          )}
         </div>
 
         {/* Search */}
@@ -55,20 +126,35 @@ export default function CustomersPage() {
           />
         </div>
 
+        {/* Loading State */}
+        {isLoading && (
+          <div className="glass-card rounded-xl p-8 text-center">
+            <p className="text-muted-foreground">Loading customers...</p>
+          </div>
+        )}
+
         {/* Table - Desktop */}
-        <div className="glass-card rounded-xl overflow-hidden hidden lg:block">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Customer</TableHead>
-                <TableHead>Contact</TableHead>
-                <TableHead>Billing Address</TableHead>
-                <TableHead>Shipping Address</TableHead>
-                <TableHead className="w-28">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredCustomers.map((customer) => (
+        {!isLoading && (
+          <div className="glass-card rounded-xl overflow-hidden hidden lg:block">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Contact</TableHead>
+                  <TableHead>Billing Address</TableHead>
+                  <TableHead>Shipping Address</TableHead>
+                  <TableHead className="w-28">Actions</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredCustomers.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center py-8 text-muted-foreground">
+                      {searchQuery ? 'No customers found matching your search.' : 'No customers found.'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredCustomers.map((customer) => (
                 <TableRow key={customer.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -118,14 +204,24 @@ export default function CustomersPage() {
                     </Button>
                   </TableCell>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        )}
 
         {/* Mobile/Tablet Cards */}
-        <div className="lg:hidden space-y-3">
-          {filteredCustomers.map((customer) => (
+        {!isLoading && (
+          <div className="lg:hidden space-y-3">
+            {filteredCustomers.length === 0 ? (
+              <div className="glass-card rounded-xl p-8 text-center">
+                <p className="text-muted-foreground">
+                  {searchQuery ? 'No customers found matching your search.' : 'No customers found.'}
+                </p>
+              </div>
+            ) : (
+              filteredCustomers.map((customer) => (
             <div key={customer.id} className="glass-card rounded-xl p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
@@ -165,8 +261,10 @@ export default function CustomersPage() {
                 View Details
               </Button>
             </div>
-          ))}
-        </div>
+              ))
+            )}
+          </div>
+        )}
       </div>
     </MainLayout>
   );

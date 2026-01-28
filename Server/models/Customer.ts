@@ -1,77 +1,93 @@
-import mongoose, {Document} from "mongoose";
+import { Schema, model, Document, Types } from 'mongoose';
 
-interface Customer extends Document {
-    customerCode: string;
-    customerName: string;
-    customerEmail: string;
-    customerPhone: string;
-    customerBillingAddress: string;
-    customerShippingAddress: string;
+/**
+ * Address subdocument used for billing and shipping addresses on a customer.
+ */
+interface IAddress {
+  city?: string;
+  country?: string;
+  postalCode?: string;
+  state?: string;
+  street?: string;
 }
 
-const customerSchema = new mongoose.Schema({
+/**
+ * Customer stores the contact and account details for a customer.
+ */
+interface ICustomer extends Document {
+  customerCode: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  salesRep?: Types.ObjectId;
+  billingAddress?: IAddress;
+  shippingAddress?: IAddress;
+  notes?: string;
+  creditLimit?: number;
+  balance?: number;
+  paymentId?: Types.ObjectId; // Reference to the payment record for this customer
+  status: 'active' | 'archived';
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+const addressSchema = new Schema<IAddress>(
+  {
+    street: String,
+    city: String,
+    state: String,
+    postalCode: String,
+    country: String,
+  },
+  { _id: false }
+);
+
+const CustomerSchema = new Schema<ICustomer>(
+  {
     customerCode: {
-        type: String,
-        unique: true,
-        trim: true
+      type: String,
+      required: true,
+      unique: true,
     },
-    customerName: {
-        type: String,
-        required: true
+    name: {
+      type: String,
+      required: true,
     },
-    customerEmail: {
-        type: String,
-        required: true,
-        unique: true,
-        lowercase: true,
-        trim: true
+    email: {type:String, required: true},
+    phone: {type:String, required: true},
+    billingAddress: {type:addressSchema, required: true},
+    shippingAddress: addressSchema,
+    notes: String,
+    creditLimit: Number,
+    balance: {
+      type: Number,
+      default: 0,
     },
-    customerPhone: {
-        type: String,
-        required: true
+    status: {
+      type: String,
+      enum: ['active', 'archived'],
+      default: 'active',
     },
-    customerBillingAddress: {
-        type: String,
-        required: true
+    salesRep: {
+      type: Schema.Types.ObjectId,
+      ref: 'User',
     },
-    customerShippingAddress: {
-        type: String,
-    }
-}, {
-    timestamps: true
-});
+    paymentId: {
+      type: Schema.Types.ObjectId,
+      ref: 'Payment',
+    },
+  },
+  { timestamps: true }
+);
 
-// Pre-save hook to auto-generate customer code
-customerSchema.pre('save', async function(this: Customer) {
-    // Only generate code for new documents that don't already have a code
-    if (!this.isNew || this.customerCode) {
-        return;
-    }
+/**
+ * IMPORTANT:
+ * customerCode must be globally unique
+ */
 
-    // Get the model from mongoose (will be available after model creation)
-    const CustomerModel = mongoose.models.Customer || mongoose.model<Customer>('Customer', customerSchema);
-    
-    // Find the customer with the highest customer code
-    const lastCustomer = await CustomerModel.findOne(
-        {},
-        { customerCode: 1 },
-        { sort: { customerCode: -1 } }
-    );
-
-    let nextNumber = 1;
-    
-    if (lastCustomer && lastCustomer.customerCode) {
-        // Extract the number from the last customer code (e.g., "C001" -> 1)
-        const match = lastCustomer.customerCode.match(/^C(\d+)$/);
-        if (match) {
-            nextNumber = parseInt(match[1], 10) + 1;
-        }
-    }
-
-    // Generate the new customer code with zero padding (C001, C002, etc.)
-    this.customerCode = `C${nextNumber.toString().padStart(3, '0')}`;
-});
-
-const Customer = mongoose.model<Customer>("Customer", customerSchema);
-
-export {Customer};
+/**
+ * Export model named "Customer"
+ */
+const Customer = model<ICustomer>('Customer', CustomerSchema);
+export { ICustomer, IAddress };
+export default Customer;

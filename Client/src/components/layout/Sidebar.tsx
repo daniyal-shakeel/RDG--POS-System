@@ -1,4 +1,5 @@
-import { NavLink, useLocation } from 'react-router-dom';
+import { useMemo } from 'react';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   FileText,
@@ -11,65 +12,233 @@ import {
   Settings,
   LogOut,
   Smartphone,
-  Printer
+  Printer,
+  PanelLeftClose,
+  PanelLeftOpen,
+  UserCog
 } from 'lucide-react';
 import { usePOS } from '@/contexts/POSContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { cn } from '@/lib/utils';
 
-const navItems = [
-  { path: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/invoices', label: 'Invoices', icon: FileText },
-  { path: '/receipts', label: 'Receipts', icon: Receipt },
-  { path: '/credit-notes', label: 'Credit Notes', icon: CreditCard },
-  { path: '/refunds', label: 'Refunds', icon: RotateCcw },
-  { path: '/estimates', label: 'Estimates', icon: FileCheck },
-  { path: '/customers', label: 'Customers', icon: Users },
-  { path: '/inventory', label: 'Inventory', icon: Package },
-  { path: '/settings', label: 'Settings', icon: Settings }
+const navItemsConfig = [
+  { 
+    path: '/', 
+    label: 'Dashboard', 
+    icon: LayoutDashboard,
+    permissions: [
+      'invoice.read', 'invoice.*',
+      'receipt.read', 'receipt.*',
+      'customer.read', 'customer.*',
+      'credit_note.read', 'credit_note.*',
+      'refund.read', 'refund.*',
+      'estimate.read', 'estimate.*'
+    ] // Dashboard visible if user has access to documents/customers (not just inventory)
+  },
+  { 
+    path: '/invoices', 
+    label: 'Invoices', 
+    icon: FileText,
+    permissions: ['invoice.read', 'invoice.*']
+  },
+  { 
+    path: '/receipts', 
+    label: 'Receipts', 
+    icon: Receipt,
+    permissions: ['receipt.read', 'receipt.*']
+  },
+  { 
+    path: '/credit-notes', 
+    label: 'Credit Notes', 
+    icon: CreditCard,
+    permissions: ['credit_note.read', 'credit_note.*']
+  },
+  { 
+    path: '/refunds', 
+    label: 'Refunds', 
+    icon: RotateCcw,
+    permissions: ['refund.read', 'refund.*']
+  },
+  { 
+    path: '/estimates', 
+    label: 'Estimates', 
+    icon: FileCheck,
+    permissions: ['estimate.read', 'estimate.*']
+  },
+  { 
+    path: '/customers', 
+    label: 'Customers', 
+    icon: Users,
+    permissions: ['customer.read', 'customer.*']
+  },
+  { 
+    path: '/users', 
+    label: 'Users', 
+    icon: UserCog,
+    permissions: ['user.read']
+  },
+  { 
+    path: '/inventory', 
+    label: 'Inventory', 
+    icon: Package,
+    permissions: ['inventory.read', 'inventory.*', 'product.read', 'product.*']
+  },
+  { 
+    path: '/settings', 
+    label: 'Settings', 
+    icon: Settings,
+    permissions: [] // Empty array means visible to all authenticated users
+  }
 ];
 
-export function Sidebar() {
+interface SidebarProps {
+  isCollapsed: boolean;
+  onToggleCollapse: () => void;
+}
+
+export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
+  const navigate = useNavigate();
   const { user, logout, deviceStatus } = usePOS();
+  const { hasPermission, hasAnyPermission } = usePermissions();
+
+  // Filter navigation items based on permissions
+  const navItems = useMemo(() => {
+    const userPermissions = user?.permissions || [];
+    const isSuperAdmin = userPermissions.includes('*');
+    
+    return navItemsConfig.filter(item => {
+      // Special handling for Super Admin only items
+      if ((item as any).isSuperAdminOnly) {
+        return isSuperAdmin;
+      }
+      
+      // If no permissions required, show to all authenticated users
+      if (!item.permissions || item.permissions.length === 0) {
+        return true;
+      }
+      
+      // Check if user has any of the required permissions
+      return hasAnyPermission(item.permissions);
+    });
+  }, [hasAnyPermission, user?.permissions]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error: any) {
+      // Error is handled in logout function, but we still navigate
+      navigate('/login');
+    }
+  };
+
+  const handleLogout = () => {
+    // Navigate immediately for instant redirect
+    navigate('/login', { replace: true });
+    // Clear state in background (don't wait for API call)
+    logout().catch(() => {
+      // Ignore errors - we've already navigated away
+    });
+  };
+
+  // Filter navigation items based on permissions
+  const navItems = useMemo(() => {
+    if (!user) {
+      return [];
+    }
+
+    const userPermissions = user?.permissions || [];
+    const userRole = user?.role;
+    const originalRole = user?.originalRole;
+    
+    // Super Admin: Only check by "*" permission or originalRole === 'Super Admin'
+    // Give super admin access to everything - no permission checks
+    const isSuperAdmin = 
+      userPermissions.includes('*') || 
+      originalRole === 'Super Admin';
+    
+    // Super Admin sees ALL items - no permission checks
+    if (isSuperAdmin) {
+      return navItemsConfig;
+    }
+    
+    // For other users, check permissions
+    return navItemsConfig.filter(item => {
+      // If no permissions required, show to all authenticated users
+      if (!item.permissions || item.permissions.length === 0) {
+        return true;
+      }
+      
+      // Check if user has any of the required permissions
+      return hasAnyPermission(item.permissions);
+    });
+  }, [hasAnyPermission, user]);
 
   return (
-    <aside className="fixed left-0 top-0 z-40 h-screen w-56 xl:w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
-      {/* Logo */}
-      <div className="p-4 xl:p-6 border-b border-sidebar-border">
-        <h1 className="font-display text-lg xl:text-xl font-bold text-gradient">
-          XYZ Company Ltd.
-        </h1>
-        <p className="text-xs text-muted-foreground mt-1">POS System</p>
+    <aside className={cn(
+      "fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300",
+      isCollapsed ? "w-16" : "w-56 xl:w-64"
+    )}>
+      {/* Logo & Minimize Button */}
+      <div className="p-4 xl:p-4 border-b border-sidebar-border flex items-center justify-between">
+        {!isCollapsed && (
+          <>
+            <div className="flex-1">
+              <h1 className="font-display text-lg xl:text-xl font-bold text-gradient">
+                XYZ Company Ltd.
+              </h1>
+              <p className="text-xs text-muted-foreground mt-1">POS System</p>
+            </div>
+          </>
+        )}
+        <button
+          onClick={onToggleCollapse}
+          className={cn(
+            "p-1.5 rounded-lg hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition-colors",
+            isCollapsed && "mx-auto"
+          )}
+          aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-5 w-5" />
+          ) : (
+            <PanelLeftClose className="h-5 w-5" />
+          )}
+        </button>
       </div>
 
       {/* Device Status */}
-      <div className="px-3 xl:px-4 py-2 xl:py-3 border-b border-sidebar-border">
-        <div className="flex items-center gap-3 xl:gap-4 text-xs">
-          <div className="flex items-center gap-1.5 xl:gap-2">
-            <Smartphone className="h-3 w-3 xl:h-3.5 xl:w-3.5" />
-            <span className="text-muted-foreground hidden xl:inline">CT60</span>
-            <span className={cn(
-              "h-2 w-2 rounded-full",
-              deviceStatus.ct60 === 'connected' && "bg-success animate-pulse-glow",
-              deviceStatus.ct60 === 'scanning' && "bg-warning animate-pulse",
-              deviceStatus.ct60 === 'disconnected' && "bg-destructive"
-            )} />
-          </div>
-          <div className="flex items-center gap-1.5 xl:gap-2">
-            <Printer className="h-3 w-3 xl:h-3.5 xl:w-3.5" />
-            <span className="text-muted-foreground hidden xl:inline">RP4</span>
-            <span className={cn(
-              "h-2 w-2 rounded-full",
-              deviceStatus.rp4 === 'connected' && "bg-success animate-pulse-glow",
-              deviceStatus.rp4 === 'printing' && "bg-info animate-pulse",
-              deviceStatus.rp4 === 'disconnected' && "bg-destructive"
-            )} />
+      {!isCollapsed && (
+        <div className="px-3 xl:px-4 py-2 xl:py-3 border-b border-sidebar-border">
+          <div className="flex items-center gap-3 xl:gap-4 text-xs">
+            <div className="flex items-center gap-1.5 xl:gap-2">
+              <Smartphone className="h-3 w-3 xl:h-3.5 xl:w-3.5" />
+              <span className="text-muted-foreground hidden xl:inline">CT60</span>
+              <span className={cn(
+                "h-2 w-2 rounded-full",
+                deviceStatus.ct60 === 'connected' && "bg-success animate-pulse-glow",
+                deviceStatus.ct60 === 'scanning' && "bg-warning animate-pulse",
+                deviceStatus.ct60 === 'disconnected' && "bg-destructive"
+              )} />
+            </div>
+            <div className="flex items-center gap-1.5 xl:gap-2">
+              <Printer className="h-3 w-3 xl:h-3.5 xl:w-3.5" />
+              <span className="text-muted-foreground hidden xl:inline">RP4</span>
+              <span className={cn(
+                "h-2 w-2 rounded-full",
+                deviceStatus.rp4 === 'connected' && "bg-success animate-pulse-glow",
+                deviceStatus.rp4 === 'printing' && "bg-info animate-pulse",
+                deviceStatus.rp4 === 'disconnected' && "bg-destructive"
+              )} />
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Navigation */}
-      <nav className="flex-1 overflow-y-auto p-3 xl:p-4 space-y-0.5 xl:space-y-1">
+      <nav className="flex-1  p-3 xl:p-4 space-y-0.5 xl:space-y-1">
         {navItems.map(item => {
           const Icon = item.icon;
           const isActive = location.pathname === item.path;
@@ -82,39 +251,55 @@ export function Sidebar() {
                 "flex items-center gap-2 xl:gap-3 px-3 xl:px-4 py-2 rounded-lg text-xs xl:text-sm font-medium transition-all duration-200",
                 isActive
                   ? "bg-primary text-primary-foreground shadow-glow"
-                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                  : "text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                isCollapsed && "justify-center"
               )}
+              title={isCollapsed ? item.label : undefined}
             >
-              <Icon className="h-4 w-4" />
-              {item.label}
+              <Icon className="h-5 w-5 flex-shrink-0" />
+              {!isCollapsed && <span>{item.label}</span>}
             </NavLink>
           );
         })}
       </nav>
 
       {/* User Profile */}
-      <div className="p-3 xl:p-4 border-t border-sidebar-border">
-        <div className="flex items-center gap-2 xl:gap-3 mb-2 xl:mb-3">
-          <div className="h-8 w-8 xl:h-10 xl:w-10 rounded-full bg-primary/20 flex items-center justify-center">
-            <span className="text-primary font-semibold text-xs xl:text-sm">
-              {user?.name?.charAt(0) || 'U'}
-            </span>
+      {!isCollapsed && (
+        <div className="p-3 xl:p-4 border-t border-sidebar-border">
+          <div className="flex items-center gap-2 xl:gap-3 mb-2 xl:mb-3">
+            <div className="h-8 w-8 xl:h-10 xl:w-10 rounded-full bg-primary/20 flex items-center justify-center">
+              <span className="text-primary font-semibold text-xs xl:text-sm">
+                {user?.name?.charAt(0)?.toUpperCase() || 'U'}
+              </span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs xl:text-sm font-medium truncate">
+                {user?.name ? user.name.charAt(0).toUpperCase() + user.name.slice(1) : 'Guest'}
+              </p>
+              <p className="text-[10px] xl:text-xs text-muted-foreground capitalize">
+                {user?.originalRole || (() => {
+                  if (!user?.role) return 'Not logged in';
+                  // Map frontend role back to display name if originalRole not available
+                  const roleDisplayMap: Record<string, string> = {
+                    'super_admin': 'Super Admin',
+                    'admin': 'Admin',
+                    'sales_rep': 'Sales Representative',
+                    'stock_keeper': 'Stock Keeper',
+                  };
+                  return roleDisplayMap[user.role] || user.role.replace('_', ' ');
+                })()}
+              </p>
+            </div>
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs xl:text-sm font-medium truncate">{user?.name || 'Guest'}</p>
-            <p className="text-[10px] xl:text-xs text-muted-foreground capitalize">
-              {user?.role?.replace('_', ' ') || 'Not logged in'}
-            </p>
-          </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-2 w-full px-3 xl:px-4 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+          >
+            <LogOut className="h-3.5 w-3.5 xl:h-4 xl:w-4" />
+            Sign Out
+          </button>
         </div>
-        <button
-          onClick={logout}
-          className="flex items-center gap-2 w-full px-3 xl:px-4 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-        >
-          <LogOut className="h-3.5 w-3.5 xl:h-4 xl:w-4" />
-          Sign Out
-        </button>
-      </div>
+      )}
     </aside>
   );
 }

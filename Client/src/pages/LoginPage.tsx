@@ -21,15 +21,25 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      const success = await login(email, password);
-      if (success) {
-        toast.success('Welcome back!');
-        navigate('/');
-      } else {
-        setError('Invalid credentials. Please try again.');
+      // Use context login function which handles API call, token storage, and user data
+      await login(email.trim(), password);
+      
+      toast.success('Login successful');
+      navigate('/');
+    } catch (error: any) {
+      // Handle API errors
+      let errorMessage = 'An error occurred. Please try again.';
+      
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        errorMessage = 'Cannot connect to server. Please make sure the backend server is running on http://localhost:5500';
+      } else if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.message) {
+        errorMessage = error.message;
       }
-    } catch {
-      setError('An error occurred. Please try again.');
+      
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }

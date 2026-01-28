@@ -1,13 +1,21 @@
 import express from "express";
-import { createReceipt, deleteReceipt, updateReceipt, getReceipts, getReceiptById } from "../controllers/Receipt";
+import {
+  createReceipt,
+  getReceipts,
+  getReceiptById,
+  generateReceiptFromInvoice,
+} from "../controllers/Receipt";
+import { authenticate } from "../middleware/auth";
+import { requirePermission } from "../middleware/permissions";
 
 const receiptRouter = express.Router();
 
-receiptRouter.post('/', createReceipt);
-receiptRouter.get('/', getReceipts);
-receiptRouter.get('/:id', getReceiptById);
-receiptRouter.put('/:id', updateReceipt);
-receiptRouter.delete('/:id', deleteReceipt);
+// All routes require authentication
+receiptRouter.use(authenticate);
+
+receiptRouter.post("/", requirePermission("receipt.create"), createReceipt);
+receiptRouter.post("/generate-from-invoice", requirePermission("receipt.create"), generateReceiptFromInvoice);
+receiptRouter.get("/", requirePermission("receipt.view"), getReceipts);
+receiptRouter.get("/:id", requirePermission("receipt.view"), getReceiptById);
 
 export default receiptRouter;
-

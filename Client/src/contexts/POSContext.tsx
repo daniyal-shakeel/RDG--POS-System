@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
-import { SalesDocument, User, DeviceStatus, Customer } from '@/types/pos';
-import { mockDocuments, mockUser, mockCustomers } from '@/data/mockData';
+import { SalesDocument, User, DeviceStatus, Customer, UserRole } from '@/types/pos';
+import { mockDocuments } from '@/data/mockData';
+import { api } from '@/services/api';
 
 interface POSContextType {
   user: User | null;
@@ -9,7 +10,7 @@ interface POSContextType {
   customers: Customer[];
   deviceStatus: DeviceStatus;
   login: (email: string, password: string) => Promise<boolean>;
-  logout: () => void;
+  logout: () => Promise<void>;
   addDocument: (doc: SalesDocument) => void;
   updateDocument: (id: string, updates: Partial<SalesDocument>) => void;
   deleteDocument: (id: string) => void;
@@ -21,27 +22,174 @@ interface POSContextType {
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
 
+// Constants for localStorage keys
+const TOKEN_KEY = 'token';
+const USER_KEY = 'user';
+const CUSTOMER_NAMES_KEY = 'customerNames';
+const SALES_REPS_KEY = 'salesReps';
+
+// Helper function to map backend role to frontend UserRole
+const mapRoleToUserRole = (role: string): UserRole => {
+  const roleMap: Record<string, UserRole> = {
+    'Super Admin': 'super_admin',
+    'Admin': 'admin',
+    'Sales Representative': 'sales_rep',
+    'Sales Rep': 'sales_rep',
+    'Stock-Keeper': 'stock_keeper',
+    'Stock Keeper': 'stock_keeper',
+  };
+  
+  // Normalize role name (remove underscores, handle variations)
+  const normalizedRole = role.replace(/_/g, ' ');
+  return roleMap[normalizedRole] || roleMap[role] || 'sales_rep';
+};
+
 export function POSProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  // Initialize user from localStorage
+  const [user, setUser] = useState<User | null>(() => {
+    const savedUser = localStorage.getItem(USER_KEY);
+    if (savedUser) {
+      try {
+        const parsedUser = JSON.parse(savedUser);
+        // Only Super Admin should have "*" permission
+        // Check by originalRole (backend role name) or if permissions already include "*"
+        if (parsedUser.originalRole === 'Super Admin' || parsedUser.permissions?.includes('*')) {
+          parsedUser.permissions = ['*'];
+        }
+        // Otherwise, use the permissions from backend (don't override)
+        return parsedUser;
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  });
+  
   const [documents, setDocuments] = useState<SalesDocument[]>(mockDocuments);
-  const [customers] = useState<Customer[]>(mockCustomers);
+  const [customers] = useState<Customer[]>([]);
   const [deviceStatus, setDeviceStatusState] = useState<DeviceStatus>({
     ct60: 'connected',
     rp4: 'connected'
   });
 
   const login = async (email: string, password: string): Promise<boolean> => {
-    // Mock authentication
-    await new Promise(resolve => setTimeout(resolve, 800));
-    if (email && password) {
-      setUser(mockUser);
+    try {
+      const response = await api.post('/api/v1/auth/login', {
+        email: email.trim(),
+        password,
+      });
+
+      const { token, user: userData } = response.data;
+
+      if (!token) {
+        throw new Error('No token received from server');
+      }
+
+      // Store token
+      localStorage.setItem(TOKEN_KEY, token);
+
+      // Map backend user data to frontend User type
+      const mappedRole = mapRoleToUserRole(userData.role || 'sales_rep');
+      // Only Super Admin gets "*" permission - check by exact role name from backend
+      const isSuperAdmin = userData.role === 'Super Admin';
+      const mappedUser: User = {
+        id: userData.id || userData._id || '',
+        name: userData.fullName || userData.name || userData.email || '',
+        email: userData.email || '',
+        role: mappedRole,
+        avatar: userData.avatar,
+        originalRole: userData.role, // Store original backend role for display
+        // Only Super Admin gets "*" permission, others use permissions from backend
+        permissions: isSuperAdmin ? ['*'] : (userData.permissions || []),
+      };
+
+      // Store user data
+      localStorage.setItem(USER_KEY, JSON.stringify(mappedUser));
+      setUser(mappedUser);
+
+      // Fetch customers and sales reps for allowed roles
+      const allowedRoles = ['Super Admin', 'Admin', 'Sales Representative'];
+      if (allowedRoles.includes(userData.role)) {
+        try {
+          const [customersResponse, usersResponse] = await Promise.all([
+            api.get('/api/v1/customer'),
+            api.get('/api/v1/user', { params: { role: 'Sales Representative' } }),
+          ]);
+
+          const customers = Array.isArray(customersResponse.data?.customers)
+            ? customersResponse.data.customers
+            : [];
+          const customerPayload = customers
+            .map((customer: any) => ({
+              id: customer?.id || customer?._id || '',
+              name: customer?.name || customer?.customerName || customer?.email || '',
+              billingAddress: customer?.billingAddress || '',
+              shippingAddress: customer?.shippingAddress || '',
+            }))
+            .filter((customer: any) => customer.id && customer.name);
+          localStorage.setItem(CUSTOMER_NAMES_KEY, JSON.stringify(customerPayload));
+
+          const users = Array.isArray(usersResponse.data?.users) ? usersResponse.data.users : [];
+          const salesReps = users
+            .filter((user: any) => {
+              const roles = Array.isArray(user?.roles) ? user.roles : [];
+              return roles.some((role: any) =>
+                (role?.name || '').toLowerCase() === 'sales representative'
+              );
+            })
+            .map((user: any) => ({
+              id: user?.id || user?._id || '',
+              name: user?.fullName || user?.name || user?.email || '',
+              email: user?.email || '',
+            }))
+            .filter((rep: any) => rep.id || rep.name || rep.email);
+          localStorage.setItem(SALES_REPS_KEY, JSON.stringify(salesReps));
+        } catch (fetchError) {
+          console.warn('Failed to load customers or sales reps:', fetchError);
+        }
+      }
+
       return true;
+    } catch (error: any) {
+      console.error('Login error:', error);
+      
+      // Provide more informative error message for network errors
+      if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
+        error.message = 'Cannot connect to server. Please make sure the backend server is running.';
+      }
+      
+      // Clear any partial data
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(CUSTOMER_NAMES_KEY);
+      localStorage.removeItem(SALES_REPS_KEY);
+      setUser(null);
+      throw error;
     }
-    return false;
   };
 
-  const logout = () => {
-    setUser(null);
+  const logout = async (): Promise<void> => {
+    try {
+      // Call logout API endpoint (token will be added automatically via interceptor)
+      // Even if API call fails, we still want to clear local state
+      try {
+        await api.post('/api/v1/auth/logout');
+      } catch (error: any) {
+        // Log error but don't throw - we still want to clear local state
+        // This handles cases where token is already invalid or expired
+        console.warn('Logout API call failed:', error.response?.data?.message || error.message);
+      }
+    } catch (error: any) {
+      // Handle unexpected errors
+      console.error('Logout error:', error);
+    } finally {
+      // Always clear local storage and user state
+      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(CUSTOMER_NAMES_KEY);
+      localStorage.removeItem(SALES_REPS_KEY);
+      setUser(null);
+    }
   };
 
   const addDocument = (doc: SalesDocument) => {
