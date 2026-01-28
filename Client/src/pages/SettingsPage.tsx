@@ -69,10 +69,10 @@ export default function SettingsPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
                   <SelectItem value="admin">Administrator</SelectItem>
-                  <SelectItem value="manager">Manager</SelectItem>
                   <SelectItem value="sales_rep">Sales Representative</SelectItem>
-                  <SelectItem value="warehouse">Warehouse Staff</SelectItem>
+                  <SelectItem value="stock_keeper">Stock Keeper</SelectItem>
                 </SelectContent>
               </Select>
             </div>

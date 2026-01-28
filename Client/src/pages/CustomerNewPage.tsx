@@ -174,36 +174,26 @@ const CustomerNewPage: React.FC = () => {
   };
 
   const onSubmit = async (data: CustomerFormData) => {
-    // Prepare data for backend
-    const customerData: {
-      name: string;
-      email: string;
-      phone: string;
-      billingAddress: typeof data.billingAddress;
-      shippingAddress?: typeof data.billingAddress;
-    } = {
-      name: data.name,
-      email: data.email,
-      phone: data.phone,
-      billingAddress: data.billingAddress,
-    };
-
-    // Handle shipping address
-    if (useSameAddress) {
-      // Use billing address as shipping address
-      customerData.shippingAddress = data.billingAddress;
-    } else if (data.shippingAddress) {
-      // Check if shipping address has any values
-      const hasShippingData = Object.values(data.shippingAddress).some(
-        (v) => v && v.trim() !== ''
-      );
-      if (hasShippingData) {
-        customerData.shippingAddress = data.shippingAddress;
-      }
-      // If no shipping data, shippingAddress will be undefined (optional)
-    }
-    
     setIsLoading(true);
+    const refreshCustomerNames = async () => {
+      try {
+        const customersResponse = await api.get('/api/v1/customer');
+        const customers = Array.isArray(customersResponse.data?.customers)
+          ? customersResponse.data.customers
+          : [];
+        const customerPayload = customers
+          .map((customer: any) => ({
+            id: customer?.id || customer?._id || '',
+            name: customer?.name || customer?.customerName || customer?.email || '',
+            billingAddress: customer?.billingAddress || '',
+            shippingAddress: customer?.shippingAddress || '',
+          }))
+          .filter((customer: any) => customer.id && customer.name);
+        localStorage.setItem('customerNames', JSON.stringify(customerPayload));
+      } catch (refreshError) {
+        console.warn('Failed to refresh customers:', refreshError);
+      }
+    };
     try {
       // Get token from localStorage and add to Authorization header
       const token = localStorage.getItem('token') || '';

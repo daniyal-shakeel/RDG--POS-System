@@ -17,7 +17,6 @@ export interface IAddress {
  * user may authenticate.
  */
 export interface IUser extends Document {
-  storeIds?: Types.ObjectId[];
   fullName: string;
   email: string;
   phone?: string;
@@ -42,7 +41,6 @@ const addressSchema = new Schema<IAddress>(
 );
 
 const UserSchema = new Schema<IUser>({
-  storeIds: { type: [Schema.Types.ObjectId], ref: 'Store', default: [] },
   fullName: { type: String, required: true },
   email: { type: String, required: true, unique: true },
   phone: { type: String },

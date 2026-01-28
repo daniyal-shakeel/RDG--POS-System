@@ -11,9 +11,15 @@ import express, { Request, Response } from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import connectDB from './config/db';
+import { getRedisClient } from './config/redis';
 import customerRouter from './routes/Customer';
 import authRouter from './routes/Auth';
 import userRouter from './routes/User';
+import estimateRouter from './routes/Estimate';
+import invoiceRouter from './routes/Invoice';
+import receiptRouter from './routes/Receipt';
+import creditNoteRouter from './routes/CreditNote';
+import refundRouter from './routes/Refund';
 
 
 const app = express();
@@ -24,7 +30,7 @@ const PORT = 5500;
 
 export const SUPER_ADMIN_EMAIL: string = process.env.SUPER_ADMIN_EMAIL || '';
 export const SUPER_ADMIN_PASSWORD: string = process.env.SUPER_ADMIN_PASSWORD || '';
-export const JWT_SECRET: string = process.env.JWT_SECRET || "your-secret-key-change-in-production";
+export const JWT_SECRET: string = process.env.JWT_SECRET || "";
 export const JWT_EXPIRES_IN: string = process.env.JWT_EXPIRES_IN || "7d";
 
 if(!JWT_SECRET || !JWT_EXPIRES_IN) {
@@ -190,6 +196,27 @@ app.get('/check-auth', (req: Request, res: Response) => {
   }
 });
 
+// Clear invoice cache (Redis)
+app.get('/clear-cache', async (_req: Request, res: Response) => {
+  try {
+    const cacheClient = await getRedisClient();
+    if (!cacheClient) {
+      return res.status(500).json({ message: 'Redis client unavailable' });
+    }
+    await cacheClient.flushAll();
+
+    return res.status(200).json({
+      message: 'Cache cleared',
+    });
+  } catch (error: any) {
+    console.error('Failed to clear invoice cache:', error);
+    return res.status(500).json({
+      message: 'Failed to clear cache',
+      error: error?.message,
+    });
+  }
+});
+
 // API routes
 
 // Error handling middleware (should be after routes)
@@ -204,9 +231,16 @@ app.use((err: Error, _req: Request, res: Response, _next: Function): void => {
 app.use('/api/v1/user', userRouter);
 app.use('/api/v1/auth', authRouter);
 app.use('/api/v1/customer', customerRouter);
+app.use('/api/v1/estimate', estimateRouter);
+app.use('/api/v1/invoice', invoiceRouter);
+app.use('/api/v1/receipt', receiptRouter);
+app.use('/api/v1/credit-notes', creditNoteRouter);
+app.use('/api/v1/refunds', refundRouter);
+console.log('Refund routes registered at /api/v1/refunds');
 
 // 404 handler
-app.use((_req: Request, res: Response): void => {
+app.use((req: Request, res: Response): void => {
+  console.log(req.originalUrl);
   res.status(404).json({ message: 'Route not found' });
 });
 
@@ -217,7 +251,7 @@ const startServer = async (): Promise<void> => {
     await connectDB();
     
     // Start server only after successful database connection
-    app.listen(PORT, (): void => {
+    app.listen(PORT,'0.0.0.0', (): void => {
       console.log(`Server is running on port ${PORT}`);
       console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     });

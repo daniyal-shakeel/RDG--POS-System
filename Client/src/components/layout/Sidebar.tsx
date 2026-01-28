@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -17,8 +18,8 @@ import {
   UserCog
 } from 'lucide-react';
 import { usePOS } from '@/contexts/POSContext';
+import { usePermissions } from '@/hooks/usePermissions';
 import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 const navItemsConfig = [
   { 
@@ -133,16 +134,47 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
     }
   };
 
-  const handleLogout = async () => {
-    try {
-      await logout();
-      toast.success('Logged out successfully');
-      navigate('/login');
-    } catch (error: any) {
-      // Error is handled in logout function, but we still navigate
-      navigate('/login');
-    }
+  const handleLogout = () => {
+    // Navigate immediately for instant redirect
+    navigate('/login', { replace: true });
+    // Clear state in background (don't wait for API call)
+    logout().catch(() => {
+      // Ignore errors - we've already navigated away
+    });
   };
+
+  // Filter navigation items based on permissions
+  const navItems = useMemo(() => {
+    if (!user) {
+      return [];
+    }
+
+    const userPermissions = user?.permissions || [];
+    const userRole = user?.role;
+    const originalRole = user?.originalRole;
+    
+    // Super Admin: Only check by "*" permission or originalRole === 'Super Admin'
+    // Give super admin access to everything - no permission checks
+    const isSuperAdmin = 
+      userPermissions.includes('*') || 
+      originalRole === 'Super Admin';
+    
+    // Super Admin sees ALL items - no permission checks
+    if (isSuperAdmin) {
+      return navItemsConfig;
+    }
+    
+    // For other users, check permissions
+    return navItemsConfig.filter(item => {
+      // If no permissions required, show to all authenticated users
+      if (!item.permissions || item.permissions.length === 0) {
+        return true;
+      }
+      
+      // Check if user has any of the required permissions
+      return hasAnyPermission(item.permissions);
+    });
+  }, [hasAnyPermission, user]);
 
   return (
     <aside className={cn(
@@ -237,18 +269,30 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
           <div className="flex items-center gap-2 xl:gap-3 mb-2 xl:mb-3">
             <div className="h-8 w-8 xl:h-10 xl:w-10 rounded-full bg-primary/20 flex items-center justify-center">
               <span className="text-primary font-semibold text-xs xl:text-sm">
-                {user?.name?.charAt(0) || 'U'}
+                {user?.name?.charAt(0)?.toUpperCase() || 'U'}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs xl:text-sm font-medium truncate">{user?.name || 'Guest'}</p>
+              <p className="text-xs xl:text-sm font-medium truncate">
+                {user?.name ? user.name.charAt(0).toUpperCase() + user.name.slice(1) : 'Guest'}
+              </p>
               <p className="text-[10px] xl:text-xs text-muted-foreground capitalize">
-                {user?.role?.replace('_', ' ') || 'Not logged in'}
+                {user?.originalRole || (() => {
+                  if (!user?.role) return 'Not logged in';
+                  // Map frontend role back to display name if originalRole not available
+                  const roleDisplayMap: Record<string, string> = {
+                    'super_admin': 'Super Admin',
+                    'admin': 'Admin',
+                    'sales_rep': 'Sales Representative',
+                    'stock_keeper': 'Stock Keeper',
+                  };
+                  return roleDisplayMap[user.role] || user.role.replace('_', ' ');
+                })()}
               </p>
             </div>
           </div>
           <button
-            onClick={logout}
+            onClick={handleLogout}
             className="flex items-center gap-2 w-full px-3 xl:px-4 py-1.5 xl:py-2 rounded-lg text-xs xl:text-sm text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
           >
             <LogOut className="h-3.5 w-3.5 xl:h-4 xl:w-4" />
