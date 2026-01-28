@@ -35,7 +35,6 @@ export const authenticate = (
     }
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
-    console.log(decoded, "decoded");
     req.user = {
       userId: decoded.userId || decoded.email, // Support both formats
       email: decoded.email,

@@ -69,6 +69,7 @@ export interface User {
   status?: UserStatus;
   avatar?: string;
   permissions?: string[];
+  originalRole?: string; // Store original backend role name for display
 }
 
 export interface DeviceStatus {

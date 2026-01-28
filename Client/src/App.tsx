@@ -64,6 +64,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/invoices/:id/edits"
+              element={
+                <ProtectedRoute>
+                  <InvoiceEditsPage />
+                </ProtectedRoute>
+              }
+            />
             
             {/* Receipts */}
             <Route
@@ -71,6 +79,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DocumentListPage type="receipt" title="Receipts" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/receipts/:id/view"
+              element={
+                <ProtectedRoute>
+                  <ReceiptViewPage />
                 </ProtectedRoute>
               }
             />
@@ -100,6 +116,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/credit-notes/:id/view"
+              element={
+                <ProtectedRoute>
+                  <CreditNoteViewPage />
+                </ProtectedRoute>
+              }
+            />
             
             {/* Refunds */}
             <Route
@@ -115,6 +139,14 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <DocumentFormPage type="refund" title="Refund" />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/refunds/:id/view"
+              element={
+                <ProtectedRoute>
+                  <RefundViewPage />
                 </ProtectedRoute>
               }
             />

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { api } from '@/services/api';
 import { UserRole } from '@/types/pos';
+import { hasPermission } from '@/utils/permissions';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -121,20 +122,7 @@ export default function ProtectedRoute({
     
     // Check if user has all required permissions
     const hasAllPermissions = requiredPermissions.every(required => {
-      // Check exact match
-      if (userPermissions.includes(required)) return true;
-      
-      // Check wildcard permissions (e.g., "customer.*" matches "customer.read")
-      const wildcardMatch = userPermissions.some(perm => {
-        if (perm === '*') return true; // Super admin
-        if (perm.endsWith('.*')) {
-          const prefix = perm.slice(0, -2);
-          return required.startsWith(prefix + '.');
-        }
-        return false;
-      });
-      
-      return wildcardMatch;
+      return hasPermission(userPermissions, required);
     });
 
     if (!hasAllPermissions) {
@@ -162,13 +150,12 @@ export default function ProtectedRoute({
 // Helper function to map backend role to frontend UserRole
 function mapBackendRoleToFrontendRole(backendRole: string): UserRole {
   const roleMap: Record<string, UserRole> = {
-    'Super Admin': 'admin',
+    'Super Admin': 'super_admin',
     'Admin': 'admin',
-    'Manager': 'manager',
-    'Sales Rep': 'sales_rep',
     'Sales Representative': 'sales_rep',
-    'Warehouse': 'warehouse',
-    'Stock-Keeper': 'warehouse',
+    'Sales Rep': 'sales_rep',
+    'Stock-Keeper': 'stock_keeper',
+    'Stock Keeper': 'stock_keeper',
   };
   
   // Normalize role name (remove underscores, handle variations)
