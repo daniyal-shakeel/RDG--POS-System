@@ -27,68 +27,67 @@ const navItemsConfig = [
     label: 'Dashboard', 
     icon: LayoutDashboard,
     permissions: [
-      'dashboard.view',
-      'invoice.view', 'invoice.*',
-      'receipt.view', 'receipt.*',
-      'customer.view', 'customer.*',
-      'creditNote.view', 'creditNote.*',
-      'refund.view', 'refund.*',
-      'estimate.view', 'estimate.*'
+      'invoice.read', 'invoice.*',
+      'receipt.read', 'receipt.*',
+      'customer.read', 'customer.*',
+      'credit_note.read', 'credit_note.*',
+      'refund.read', 'refund.*',
+      'estimate.read', 'estimate.*'
     ] // Dashboard visible if user has access to documents/customers (not just inventory)
   },
   { 
     path: '/invoices', 
     label: 'Invoices', 
     icon: FileText,
-    permissions: ['invoice.view', 'invoice.*']
+    permissions: ['invoice.read', 'invoice.*']
   },
   { 
     path: '/receipts', 
     label: 'Receipts', 
     icon: Receipt,
-    permissions: ['receipt.view', 'receipt.*']
+    permissions: ['receipt.read', 'receipt.*']
   },
   { 
     path: '/credit-notes', 
     label: 'Credit Notes', 
     icon: CreditCard,
-    permissions: ['creditNote.view', 'creditNote.*']
+    permissions: ['credit_note.read', 'credit_note.*']
   },
   { 
     path: '/refunds', 
     label: 'Refunds', 
     icon: RotateCcw,
-    permissions: ['refund.view', 'refund.*']
+    permissions: ['refund.read', 'refund.*']
   },
   { 
     path: '/estimates', 
     label: 'Estimates', 
     icon: FileCheck,
-    permissions: ['estimate.view', 'estimate.*']
+    permissions: ['estimate.read', 'estimate.*']
   },
   { 
     path: '/customers', 
     label: 'Customers', 
     icon: Users,
-    permissions: ['customer.view', 'customer.*']
+    permissions: ['customer.read', 'customer.*']
   },
   { 
     path: '/users', 
     label: 'Users', 
     icon: UserCog,
-    permissions: ['user.manage']
+    permissions: ['user.read']
   },
   { 
     path: '/inventory', 
     label: 'Inventory', 
     icon: Package,
-    permissions: ['inventory.view', 'inventory.*', 'product.view', 'product.*']
+    permissions: ['inventory.read', 'inventory.*', 'product.read', 'product.*']
   },
   { 
     path: '/settings', 
     label: 'Settings', 
     icon: Settings,
-    permissions: ['settings.view'] // Settings visible to users with settings.view permission
+    permissions: [] // Empty array means visible to all authenticated users
   }
 ];
 
@@ -101,7 +100,39 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { user, logout, deviceStatus } = usePOS();
-  const { hasAnyPermission } = usePermissions();
+  const { hasPermission, hasAnyPermission } = usePermissions();
+
+  // Filter navigation items based on permissions
+  const navItems = useMemo(() => {
+    const userPermissions = user?.permissions || [];
+    const isSuperAdmin = userPermissions.includes('*');
+    
+    return navItemsConfig.filter(item => {
+      // Special handling for Super Admin only items
+      if ((item as any).isSuperAdminOnly) {
+        return isSuperAdmin;
+      }
+      
+      // If no permissions required, show to all authenticated users
+      if (!item.permissions || item.permissions.length === 0) {
+        return true;
+      }
+      
+      // Check if user has any of the required permissions
+      return hasAnyPermission(item.permissions);
+    });
+  }, [hasAnyPermission, user?.permissions]);
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast.success('Logged out successfully');
+      navigate('/login');
+    } catch (error: any) {
+      // Error is handled in logout function, but we still navigate
+      navigate('/login');
+    }
+  };
 
   const handleLogout = () => {
     // Navigate immediately for instant redirect
