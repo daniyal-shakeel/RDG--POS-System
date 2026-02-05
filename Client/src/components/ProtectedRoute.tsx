@@ -4,6 +4,19 @@ import { api } from '@/services/api';
 import { UserRole } from '@/types/pos';
 import { hasPermission } from '@/utils/permissions';
 
+// Persists across route changes so we don't show loading when switching tabs/routes
+let hasCompletedInitialAuth = false;
+const AUTH_USER_CACHE_KEY = 'auth_user_cache';
+
+function getCachedAuthUser(): AuthResponse['user'] | null {
+  try {
+    const cached = sessionStorage.getItem(AUTH_USER_CACHE_KEY);
+    return cached ? JSON.parse(cached) : null;
+  } catch {
+    return null;
+  }
+}
+
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: UserRole | UserRole[];
@@ -28,52 +41,61 @@ export default function ProtectedRoute({
   requiredRole,
   requiredPermission,
 }: ProtectedRouteProps) {
-  const [isLoading, setIsLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [user, setUser] = useState<AuthResponse['user'] | null>(null);
+  // When switching routes: use cached auth to avoid loading flash; check-auth runs in background
+  const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
+  const cachedUser = hasCompletedInitialAuth && token ? getCachedAuthUser() : null;
+  const [isLoading, setIsLoading] = useState(!!token && !cachedUser);
+  const [isAuthenticated, setIsAuthenticated] = useState(!!cachedUser);
+  const [user, setUser] = useState<AuthResponse['user'] | null>(cachedUser);
   const location = useLocation();
 
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        setIsLoading(true);
+        // Only show loading on very first app load - run check-auth silently when switching tabs/routes
+        if (!hasCompletedInitialAuth) {
+          setIsLoading(true);
+        }
 
         // Check if token exists in localStorage
         const token = localStorage.getItem('token');
         if (!token) {
           setIsAuthenticated(false);
           setIsLoading(false);
+          hasCompletedInitialAuth = false; // Reset so next login shows loading on first check
+          sessionStorage.removeItem(AUTH_USER_CACHE_KEY);
           return;
         }
 
-        // Call check-auth endpoint
+        // Call check-auth endpoint (runs behind the scenes on tab/route changes)
         const response = await api.get<AuthResponse>('/check-auth');
         
         if (response.data.authenticated && response.data.user) {
           setIsAuthenticated(true);
           setUser(response.data.user);
+          sessionStorage.setItem(AUTH_USER_CACHE_KEY, JSON.stringify(response.data.user));
         } else {
           setIsAuthenticated(false);
-          // Clear invalid token
+          sessionStorage.removeItem(AUTH_USER_CACHE_KEY);
           localStorage.removeItem('token');
           localStorage.removeItem('user');
         }
       } catch (error: any) {
         console.error('Auth check failed:', error);
         setIsAuthenticated(false);
-        
-        // Clear invalid token
+        sessionStorage.removeItem(AUTH_USER_CACHE_KEY);
         localStorage.removeItem('token');
         localStorage.removeItem('user');
       } finally {
         setIsLoading(false);
+        hasCompletedInitialAuth = true;
       }
     };
 
     checkAuth();
   }, [location.pathname]);
 
-  // Show loading state
+  // Show loading only on very first load - never when switching tabs/routes
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">

@@ -10,8 +10,10 @@ interface MainLayoutProps {
 const SIDEBAR_COLLAPSED_KEY = 'sidebar-collapsed';
 
 export function MainLayout({ children }: MainLayoutProps) {
-  // Initialize state from localStorage, default to false
+  // Initialize state: on mobile always start collapsed; on desktop use localStorage
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    if (window.innerWidth < 768) return true; // Mobile: always collapsed by default
     const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
     return saved ? JSON.parse(saved) : false;
   });

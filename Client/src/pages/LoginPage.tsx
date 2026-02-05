@@ -31,7 +31,7 @@ export default function LoginPage() {
       let errorMessage = 'An error occurred. Please try again.';
       
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
-        errorMessage = 'Cannot connect to server. Please make sure the backend server is running on http://localhost:5500';
+        errorMessage = 'Cannot connect to server. Check your connection and that the backend is reachable.';
       } else if (error.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error.message) {
