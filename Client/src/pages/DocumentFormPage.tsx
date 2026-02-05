@@ -1468,21 +1468,8 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {/* <Button variant="outline" onClick={handleExport} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
-              <Send className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handlePrint}
-              disabled={deviceStatus.rp4 !== 'connected' || isNew}
-              size="sm"
-              className="text-xs sm:text-sm flex-1 sm:flex-none"
-            >
-              <Printer className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Print</span>
-            </Button> */}
-            {!isInvoiceEditView && type !== 'credit_note' && (
+            {/* Primary save actions */}
+            {!isInvoiceEditView && type !== 'credit_note' && type !== 'refund' && (
               <>
                 <Button variant="outline" onClick={() => handleSave('draft')} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
                   <span className="sm:hidden">Draft</span>

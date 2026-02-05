@@ -37,6 +37,12 @@ const navItemsConfig = [
     ] // Dashboard visible if user has access to documents/customers (not just inventory)
   },
   { 
+    path: '/estimates', 
+    label: 'Estimates', 
+    icon: FileCheck,
+    permissions: ['estimate.view', 'estimate.*']
+  },
+  { 
     path: '/invoices', 
     label: 'Invoices', 
     icon: FileText,
@@ -61,10 +67,10 @@ const navItemsConfig = [
     permissions: ['refund.view', 'refund.*']
   },
   { 
-    path: '/estimates', 
-    label: 'Estimates', 
-    icon: FileCheck,
-    permissions: ['estimate.view', 'estimate.*']
+    path: '/inventory', 
+    label: 'Inventory', 
+    icon: Package,
+    permissions: ['inventory.view', 'inventory.*', 'product.view', 'product.*']
   },
   { 
     path: '/customers', 
@@ -77,12 +83,6 @@ const navItemsConfig = [
     label: 'Users', 
     icon: UserCog,
     permissions: ['user.manage']
-  },
-  { 
-    path: '/inventory', 
-    label: 'Inventory', 
-    icon: Package,
-    permissions: ['inventory.view', 'inventory.*', 'product.view', 'product.*']
   },
   { 
     path: '/settings', 

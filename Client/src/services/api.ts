@@ -31,13 +31,16 @@ api.interceptors.response.use(
     if (error.response?.status === 401) {
       // Skip redirect for logout endpoint - logout function handles it
       const isLogoutEndpoint = error.config?.url?.includes('/auth/logout');
+      // Skip redirect for login endpoint - login page handles 401 errors
+      const isLoginEndpoint = error.config?.url?.includes('/auth/login');
       
       // Token expired or invalid - clear token and redirect to login
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       
       // Only redirect if not on logout endpoint (logout handles its own navigation)
-      if (!isLogoutEndpoint) {
+      // and not on login endpoint (we want to show error message instead of refreshing)
+      if (!isLogoutEndpoint && !isLoginEndpoint) {
         window.location.href = '/login';
       }
     }

@@ -4,12 +4,13 @@ import { usePOS } from '@/contexts/POSContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { LogIn, Lock, Mail, AlertCircle } from 'lucide-react';
+import { LogIn, Lock, Mail, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const { login } = usePOS();
@@ -23,13 +24,13 @@ export default function LoginPage() {
     try {
       // Use context login function which handles API call, token storage, and user data
       await login(email.trim(), password);
-      
+
       toast.success('Login successful');
       navigate('/');
     } catch (error: any) {
       // Handle API errors
       let errorMessage = 'An error occurred. Please try again.';
-      
+
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
         errorMessage = 'Cannot connect to server. Please make sure the backend server is running on http://localhost:5500';
       } else if (error.response?.data?.message) {
@@ -37,7 +38,7 @@ export default function LoginPage() {
       } else if (error.message) {
         errorMessage = error.message;
       }
-      
+
       setError(errorMessage);
       toast.error(errorMessage);
     } finally {
@@ -104,13 +105,25 @@ export default function LoginPage() {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? 'text' : 'password'}
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 pr-10"
                   required
                 />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((prev) => !prev)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
               </div>
             </div>
 
@@ -128,11 +141,11 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-border">
+          {/* <div className="mt-6 pt-6 border-t border-border">
             <p className="text-xs text-center text-muted-foreground">
               Demo credentials: Use any email and password
             </p>
-          </div>
+          </div> */}
         </div>
 
         {/* Footer */}
