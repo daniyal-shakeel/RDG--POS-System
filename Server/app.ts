@@ -7,7 +7,7 @@ import { resolve } from 'path';
 const envPath = resolve(process.cwd(), '.env');
 dotenv.config({ path: envPath });
 
-import express, { Request, Response } from 'express';
+import express, { Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import jwt from 'jsonwebtoken';
 import connectDB from './config/db';
@@ -20,7 +20,8 @@ import invoiceRouter from './routes/Invoice';
 import receiptRouter from './routes/Receipt';
 import creditNoteRouter from './routes/CreditNote';
 import refundRouter from './routes/Refund';
-
+import { logRequestAsync } from './utils/requestLogger';
+import { idempotencyMiddleware } from './utils/idempotency';
 
 const app = express();
 
@@ -42,9 +43,25 @@ if(!SUPER_ADMIN_EMAIL || !SUPER_ADMIN_PASSWORD) {
   console.error('SUPER_ADMIN_EMAIL and SUPER_ADMIN_PASSWORD must be set');
   process.exit(1);
 }
+
 // Middleware
-app.use(cors());
+app.use(cors({
+  origin: "http://localhost:8080",
+  methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Idempotency-Key"],
+  credentials: true,
+}));
+
 app.use(express.json({ limit: '10mb' })); // Limit JSON payload size to prevent DoS
+
+// Reject duplicate submissions when X-Idempotency-Key is sent (create/update routes)
+app.use(idempotencyMiddleware);
+
+// Async request logging to request.log (non-blocking)
+app.use((req: Request, _res: Response, next: NextFunction) => {
+  logRequestAsync(req);
+  next();
+});
 
 // Health check endpoint
 app.get('/', (_req: Request, res: Response): void => {

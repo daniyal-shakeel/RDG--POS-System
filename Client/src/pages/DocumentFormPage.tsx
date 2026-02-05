@@ -96,6 +96,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
   const [refundStatus, setRefundStatus] = useState<'DRAFT' | 'REFUNDED' | null>(null);
   const [selectedCreditNoteId, setSelectedCreditNoteId] = useState<string>('');
   const [refundSource, setRefundSource] = useState<'FROM_CREDITNOTE' | 'STANDALONE'>('STANDALONE');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const effectiveCustomers = apiCustomers;
     const getCustomerId = (customer: Customer, index?: number) =>
@@ -848,6 +849,10 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
   };
 
   const handleSave = async (status: 'draft' | 'pending') => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    const idempotencyKey = crypto.randomUUID();
+    try {
     if (isInvoiceEditView) {
       return;
     }
@@ -914,7 +919,9 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       };
 
       try {
-        const response = await api.post('/api/v1/receipt', receiptPayload);
+        const response = await api.post('/api/v1/receipt', receiptPayload, {
+          headers: { 'X-Idempotency-Key': idempotencyKey },
+        });
         toast.success('Receipt created successfully');
         
         // If print is true and printer is connected, print the receipt
@@ -1014,7 +1021,9 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       try {
         if (isNew) {
           // Create new credit note
-          const response = await api.post('/api/v1/credit-notes', creditNotePayload);
+          const response = await api.post('/api/v1/credit-notes', creditNotePayload, {
+            headers: { 'X-Idempotency-Key': idempotencyKey },
+          });
           toast.success('Credit note created successfully');
           navigate('/credit-notes');
         } else {
@@ -1023,7 +1032,9 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             toast.error('Only draft credit notes can be edited');
             return;
           }
-          const response = await api.put(`/api/v1/credit-notes/${id}`, creditNotePayload);
+          const response = await api.put(`/api/v1/credit-notes/${id}`, creditNotePayload, {
+            headers: { 'X-Idempotency-Key': idempotencyKey },
+          });
           toast.success('Credit note updated successfully');
           navigate('/credit-notes');
         }
@@ -1114,7 +1125,9 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       try {
         if (isNew) {
           // Create new refund
-          const response = await api.post('/api/v1/refunds', refundPayload);
+          const response = await api.post('/api/v1/refunds', refundPayload, {
+            headers: { 'X-Idempotency-Key': idempotencyKey },
+          });
           toast.success('Refund created successfully');
           navigate('/refunds');
         } else {
@@ -1123,7 +1136,9 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             toast.error('Only draft refunds can be edited');
             return;
           }
-          const response = await api.put(`/api/v1/refunds/${id}`, refundPayload);
+          const response = await api.put(`/api/v1/refunds/${id}`, refundPayload, {
+            headers: { 'X-Idempotency-Key': idempotencyKey },
+          });
           toast.success('Refund updated successfully');
           navigate('/refunds');
         }
@@ -1217,7 +1232,10 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         const response = await api.post(
           '/api/v1/invoice',
           invoicePayload,
-          estimateReference ? { params: { estimateReference } } : undefined
+          {
+            ...(estimateReference ? { params: { estimateReference } } : {}),
+            headers: { 'X-Idempotency-Key': idempotencyKey },
+          }
         );
         toast.success('Invoice created successfully');
 
@@ -1309,9 +1327,13 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             return;
           }
           const token = localStorage.getItem('token') || '';
-          await api.put(`/api/v1/estimate/${refNumber}`, { token, payload });
+          await api.put(`/api/v1/estimate/${refNumber}`, { token, payload }, {
+            headers: { 'X-Idempotency-Key': idempotencyKey },
+          });
         } else {
-          await api.post('/api/v1/estimate/save', payload);
+          await api.post('/api/v1/estimate/save', payload, {
+            headers: { 'X-Idempotency-Key': idempotencyKey },
+          });
         }
       } catch (error) {
         console.error('Estimate save error:', error);
@@ -1362,9 +1384,16 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       // Fallback for any other document types
       navigate(`/${type}s`);
     }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleUpdateInvoice = async () => {
+    if (isSubmitting) return;
+    setIsSubmitting(true);
+    const idempotencyKey = crypto.randomUUID();
+    try {
     if (!isInvoiceEditView || type !== 'invoice') {
       return;
     }
@@ -1435,13 +1464,18 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     };
 
     try {
-      await api.post(`/api/v1/invoice/${id}/edits`, payload);
+      await api.post(`/api/v1/invoice/${id}/edits`, payload, {
+        headers: { 'X-Idempotency-Key': idempotencyKey },
+      });
       toast.success('Invoice updated successfully');
       navigate('/invoices');
     } catch (error: any) {
       console.error('Update invoice error:', error);
       const errorMessage = error?.response?.data?.message || 'Failed to update invoice';
       toast.error(errorMessage);
+    }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1484,11 +1518,11 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             </Button> */}
             {!isInvoiceEditView && type !== 'credit_note' && (
               <>
-                <Button variant="outline" onClick={() => handleSave('draft')} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
+                <Button variant="outline" onClick={() => handleSave('draft')} disabled={isSubmitting} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
                   <span className="sm:hidden">Draft</span>
                   <span className="hidden sm:inline">Save Draft</span>
                 </Button>
-                <Button onClick={() => handleSave('pending')} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
+                <Button onClick={() => handleSave('pending')} disabled={isSubmitting} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
                   <Save className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Save & Print</span>
                   <span className="sm:hidden">Save & Print</span>
@@ -1497,11 +1531,11 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             )}
             {type === 'credit_note' && creditNoteStatus !== 'APPROVED' && (
               <>
-                <Button variant="outline" onClick={() => handleSave('draft')} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
+                <Button variant="outline" onClick={() => handleSave('draft')} disabled={isSubmitting} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
                   <span className="sm:hidden">Draft</span>
                   <span className="hidden sm:inline">Save Draft</span>
                 </Button>
-                <Button onClick={() => handleSave('pending')} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
+                <Button onClick={() => handleSave('pending')} disabled={isSubmitting} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
                   <Save className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Save & Print</span>
                   <span className="sm:hidden">Save & Print</span>
@@ -1510,11 +1544,11 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             )}
             {type === 'refund' && refundStatus !== 'REFUNDED' && (
               <>
-                <Button variant="outline" onClick={() => handleSave('draft')} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
+                <Button variant="outline" onClick={() => handleSave('draft')} disabled={isSubmitting} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
                   <span className="sm:hidden">Draft</span>
                   <span className="hidden sm:inline">Save Draft</span>
                 </Button>
-                <Button onClick={() => handleSave('pending')} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
+                <Button onClick={() => handleSave('pending')} disabled={isSubmitting} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
                   <Save className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Save & Print</span>
                   <span className="sm:hidden">Save & Print</span>
@@ -1522,7 +1556,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
               </>
             )}
             {isInvoiceEditView && (
-              <Button onClick={handleUpdateInvoice} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
+              <Button onClick={handleUpdateInvoice} disabled={isSubmitting} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
                 <Save className="h-4 w-4 sm:mr-2" />
                 Update Invoice
               </Button>

@@ -29,20 +29,21 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Skip redirect for logout endpoint - logout function handles it
-      const isLogoutEndpoint = error.config?.url?.includes('/auth/logout');
-      
+      const url = error.config?.url ?? '';
+      const isLogoutEndpoint = url.includes('/auth/logout');
+      const isLoginEndpoint = url.includes('/auth/login');
+      // Skip redirect for logout (handled by logout) and login (page handles error, no reload)
+      if (isLogoutEndpoint || isLoginEndpoint) {
+        return Promise.reject(error);
+      }
       // Token expired or invalid - clear token and redirect to login
       localStorage.removeItem('token');
       localStorage.removeItem('user');
-      
-      // Only redirect if not on logout endpoint (logout handles its own navigation)
-      if (!isLogoutEndpoint) {
-        window.location.href = '/login';
-      }
+      window.location.href = '/login';
     }
     return Promise.reject(error);
   }
 );
 
+export { API_BASE_URL };
 export default api;
