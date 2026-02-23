@@ -1,8 +1,8 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * Address subdocument used for billing and shipping addresses on a customer.
- */
+
+
+
 interface IAddress {
   city?: string;
   country?: string;
@@ -11,9 +11,9 @@ interface IAddress {
   street?: string;
 }
 
-/**
- * Customer stores the contact and account details for a customer.
- */
+
+
+
 interface ICustomer extends Document {
   customerCode: string;
   name: string;
@@ -25,7 +25,7 @@ interface ICustomer extends Document {
   notes?: string;
   creditLimit?: number;
   balance?: number;
-  paymentId?: Types.ObjectId; // Reference to the payment record for this customer
+  paymentId?: Types.ObjectId; 
   status: 'active' | 'archived';
   createdAt: Date;
   updatedAt: Date;
@@ -80,14 +80,14 @@ const CustomerSchema = new Schema<ICustomer>(
   { timestamps: true }
 );
 
-/**
- * IMPORTANT:
- * customerCode must be globally unique
- */
 
-/**
- * Export model named "Customer"
- */
+
+
+
+
+
+
+
 const Customer = model<ICustomer>('Customer', CustomerSchema);
 export { ICustomer, IAddress };
 export default Customer;

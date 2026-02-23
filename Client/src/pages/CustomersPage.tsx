@@ -35,7 +35,7 @@ interface BackendCustomer {
   shippingAddress?: IAddress;
 }
 
-// Helper function to format address object to string
+
 const formatAddress = (address?: IAddress): string => {
   if (!address) return 'N/A';
   
@@ -64,7 +64,7 @@ export default function CustomersPage() {
         const response = await api.get('/api/v1/customer');
         const backendCustomers: BackendCustomer[] = response.data.customers || [];
         
-        // Transform backend data to frontend Customer type
+        
         const transformedCustomers: Customer[] = backendCustomers.map((customer) => ({
           id: customer._id,
           name: customer.name,
@@ -96,7 +96,7 @@ export default function CustomersPage() {
   return (
     <MainLayout>
       <div className="space-y-4 sm:space-y-6 animate-fade-in">
-        {/* Header */}
+        {}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-display font-bold">Customers</h1>
@@ -115,7 +115,7 @@ export default function CustomersPage() {
           )}
         </div>
 
-        {/* Search */}
+        {}
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -126,14 +126,14 @@ export default function CustomersPage() {
           />
         </div>
 
-        {/* Loading State */}
+        {}
         {isLoading && (
           <div className="glass-card rounded-xl p-8 text-center">
             <p className="text-muted-foreground">Loading customers...</p>
           </div>
         )}
 
-        {/* Table - Desktop */}
+        {}
         {!isLoading && (
           <div className="glass-card rounded-xl overflow-hidden hidden lg:block">
             <Table>
@@ -211,7 +211,7 @@ export default function CustomersPage() {
           </div>
         )}
 
-        {/* Mobile/Tablet Cards */}
+        {}
         {!isLoading && (
           <div className="lg:hidden space-y-3">
             {filteredCustomers.length === 0 ? (

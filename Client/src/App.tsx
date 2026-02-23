@@ -6,7 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { POSProvider } from "@/contexts/POSContext";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
-// Pages
+
 import LoginPage from "./pages/LoginPage";
 import Dashboard from "./pages/Dashboard";
 import DocumentListPage from "./pages/DocumentListPage";
@@ -21,6 +21,7 @@ import CustomerViewPage from "./pages/CustomerViewPage";
 import InventoryPage from "./pages/InventoryPage";
 import ProductNewPage from "./pages/ProductNewPage";
 import ProductViewPage from "./pages/ProductViewPage";
+import ShipmentsPage from "./pages/ShipmentsPage";
 import SettingsPage from "./pages/SettingsPage";
 import UsersPage from "./pages/UsersPage";
 import NotFound from "./pages/NotFound";
@@ -37,7 +38,7 @@ const App = () => (
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             
-            {/* Protected Routes */}
+            {}
             <Route
               path="/"
               element={
@@ -47,7 +48,7 @@ const App = () => (
               }
             />
             
-            {/* Invoices */}
+            {}
             <Route
               path="/invoices"
               element={
@@ -73,7 +74,7 @@ const App = () => (
               }
             />
             
-            {/* Receipts */}
+            {}
             <Route
               path="/receipts"
               element={
@@ -99,7 +100,7 @@ const App = () => (
               }
             />
             
-            {/* Credit Notes */}
+            {}
             <Route
               path="/credit-notes"
               element={
@@ -125,7 +126,7 @@ const App = () => (
               }
             />
             
-            {/* Refunds */}
+            {}
             <Route
               path="/refunds"
               element={
@@ -151,7 +152,7 @@ const App = () => (
               }
             />
             
-            {/* Estimates */}
+            {}
             <Route
               path="/estimates"
               element={
@@ -169,7 +170,7 @@ const App = () => (
               }
             />
             
-            {/* Customers */}
+            {}
             <Route
               path="/customers"
               element={
@@ -203,7 +204,7 @@ const App = () => (
               }
             />
             
-            {/* Inventory */}
+            {}
             <Route
               path="/inventory"
               element={
@@ -228,8 +229,16 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/shipments"
+              element={
+                <ProtectedRoute>
+                  <ShipmentsPage />
+                </ProtectedRoute>
+              }
+            />
             
-            {/* Users */}
+            {}
             <Route
               path="/users"
               element={

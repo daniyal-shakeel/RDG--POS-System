@@ -5,10 +5,10 @@ import { hasPermission, requirePermission } from "../middleware/permissions";
 
 const userRouter = express.Router();
 
-// All routes require authentication
+
 userRouter.use(authenticate);
 
-// GET /users - requires user.manage, or estimate.create when requesting Sales Representatives
+
 userRouter.get("/", (req: AuthRequest, res, next) => {
   const roleQuery = typeof req.query?.role === "string" ? req.query.role.trim() : "";
   const isSalesRepQuery =
@@ -25,13 +25,13 @@ userRouter.get("/", (req: AuthRequest, res, next) => {
   return requirePermission("user.manage")(req, res, next);
 }, getUsers);
 
-// POST /users - requires Super Admin role (only Super Admin can create users)
+
 userRouter.post("/", authorize("Super Admin"), createUser);
 
-// PATCH /users/:id/suspend - requires Super Admin role (only Super Admin can suspend)
+
 userRouter.patch("/:id/suspend", authorize("Super Admin"), suspendUser);
 
-// PATCH /users/:id/unsuspend - requires Super Admin role (only Super Admin can unsuspend)
+
 userRouter.patch("/:id/unsuspend", authorize("Super Admin"), unsuspendUser);
 
 export default userRouter;

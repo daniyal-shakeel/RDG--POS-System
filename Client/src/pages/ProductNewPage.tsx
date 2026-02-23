@@ -9,60 +9,57 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Save, Package, DollarSign, Tag, Barcode } from 'lucide-react';
+import { ArrowLeft, Save, Package } from 'lucide-react';
 import { toast } from 'sonner';
+import { adjustMrpeasyInventory } from '@/services/mrpeasy';
 
-const productSchema = z.object({
-  code: z.string().min(1, 'Product code is required').max(20),
-  name: z.string().min(1, 'Product name is required').max(100),
-  description: z.string().max(500).optional(),
-  price: z.number().min(0.01, 'Price must be greater than 0'),
-  cost: z.number().min(0, 'Cost cannot be negative').optional(),
-  category: z.string().min(1, 'Category is required'),
-  stock: z.number().int().min(0, 'Stock cannot be negative'),
-  minStock: z.number().int().min(0).optional(),
-  barcode: z.string().max(50).optional(),
+const adjustSchema = z.object({
+  sku: z.string().trim().min(1, 'SKU is required'),
+  quantityDelta: z.number().int('Quantity delta must be a whole number').refine((n) => n !== 0, {
+    message: 'Quantity delta cannot be 0',
+  }),
+  reason: z.string().max(1000, 'Reason must be 1000 characters or less').optional(),
+  idempotencyKey: z.string().max(256, 'Idempotency key must be 256 characters or less').optional(),
 });
 
-type ProductFormData = z.infer<typeof productSchema>;
-
-const categories = [
-  'Dates',
-  'Gift Boxes',
-  'Snacks',
-  'Beverages',
-  'Accessories',
-];
+type AdjustFormData = z.infer<typeof adjustSchema>;
 
 const ProductNewPage: React.FC = () => {
   const navigate = useNavigate();
   
-  const form = useForm<ProductFormData>({
-    resolver: zodResolver(productSchema),
+  const form = useForm<AdjustFormData>({
+    resolver: zodResolver(adjustSchema),
     defaultValues: {
-      code: '',
-      name: '',
-      description: '',
-      price: 0,
-      cost: 0,
-      category: '',
-      stock: 0,
-      minStock: 10,
-      barcode: '',
+      sku: '',
+      quantityDelta: 0,
+      reason: '',
+      idempotencyKey: '',
     },
   });
 
-  const onSubmit = (data: ProductFormData) => {
-    console.log('New product:', data);
-    toast.success('Product created successfully');
-    navigate('/inventory');
+  const onSubmit = async (data: AdjustFormData) => {
+    try {
+      await adjustMrpeasyInventory({
+        sku: data.sku.trim(),
+        quantityDelta: data.quantityDelta,
+        reason: data.reason?.trim() || undefined,
+        idempotencyKey: data.idempotencyKey?.trim() || undefined,
+      });
+      toast.success('Inventory adjusted successfully');
+      navigate(`/inventory/${encodeURIComponent(data.sku.trim())}`);
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        'Failed to adjust inventory';
+      toast.error(message);
+    }
   };
 
   return (
     <MainLayout>
       <div className="space-y-4 md:space-y-6">
-        {/* Header */}
+        {}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Button 
             variant="ghost" 
@@ -74,237 +71,91 @@ const ProductNewPage: React.FC = () => {
             Back
           </Button>
           <div>
-            <h1 className="text-xl md:text-2xl font-bold text-foreground">New Product</h1>
-            <p className="text-sm text-muted-foreground">Add a new product to your inventory</p>
+            <h1 className="text-xl md:text-2xl font-bold text-foreground">Adjust Inventory</h1>
+            <p className="text-sm text-muted-foreground">Submit a stock adjustment for an existing SKU</p>
           </div>
         </div>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-              {/* Basic Information */}
-              <Card>
-                <CardHeader className="pb-3 md:pb-4">
-                  <CardTitle className="text-base md:text-lg flex items-center gap-2">
-                    <Package className="h-4 w-4 md:h-5 md:w-5" />
-                    Product Details
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="code"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Product Code</FormLabel>
-                          <FormControl>
-                            <Input placeholder="RDG-001" {...field} />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="barcode"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Barcode (Optional)</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Barcode className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                              <Input className="pl-10" placeholder="Enter barcode" {...field} />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
+            <Card>
+              <CardHeader className="pb-3 md:pb-4">
+                <CardTitle className="text-base md:text-lg flex items-center gap-2">
+                  <Package className="h-4 w-4 md:h-5 md:w-5" />
+                  Adjustment Details
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
-                    name="name"
+                    name="sku"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Product Name</FormLabel>
+                        <FormLabel>SKU</FormLabel>
                         <FormControl>
-                          <Input placeholder="Premium Medjool Dates 500g" {...field} />
+                          <Input placeholder="MOCK-001" {...field} />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  
+
                   <FormField
                     control={form.control}
-                    name="category"
+                    name="quantityDelta"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} defaultValue={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {categories.map((cat) => (
-                              <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Description (Optional)</FormLabel>
+                        <FormLabel>Quantity Delta</FormLabel>
                         <FormControl>
-                          <Textarea 
-                            placeholder="Enter product description" 
-                            className="min-h-[80px] md:min-h-[100px]" 
-                            {...field} 
+                          <Input
+                            type="number"
+                            step="1"
+                            placeholder="-5 or 10"
+                            value={field.value}
+                            onChange={(e) => field.onChange(parseInt(e.target.value, 10) || 0)}
                           />
                         </FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                </CardContent>
-              </Card>
+                </div>
 
-              {/* Pricing & Stock */}
-              <Card>
-                <CardHeader className="pb-3 md:pb-4">
-                  <CardTitle className="text-base md:text-lg flex items-center gap-2">
-                    <DollarSign className="h-4 w-4 md:h-5 md:w-5" />
-                    Pricing & Inventory
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="price"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Selling Price</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                              <Input 
-                                type="number" 
-                                step="0.01"
-                                className="pl-10" 
-                                placeholder="0.00" 
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="cost"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Cost Price (Optional)</FormLabel>
-                          <FormControl>
-                            <div className="relative">
-                              <Tag className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                              <Input 
-                                type="number" 
-                                step="0.01"
-                                className="pl-10" 
-                                placeholder="0.00" 
-                                {...field}
-                                onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                              />
-                            </div>
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="stock"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Current Stock</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              placeholder="0" 
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    
-                    <FormField
-                      control={form.control}
-                      name="minStock"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Minimum Stock Alert</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="number" 
-                              placeholder="10" 
-                              {...field}
-                              onChange={(e) => field.onChange(parseInt(e.target.value) || 0)}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  
-                  {/* Price Summary */}
-                  <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-                    <h4 className="text-sm font-medium mb-3">Price Summary</h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Selling Price:</span>
-                        <span className="font-medium">${form.watch('price')?.toFixed(2) || '0.00'}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Cost Price:</span>
-                        <span>${form.watch('cost')?.toFixed(2) || '0.00'}</span>
-                      </div>
-                      <div className="flex justify-between border-t pt-2">
-                        <span className="text-muted-foreground">Profit Margin:</span>
-                        <span className="font-medium text-green-600">
-                          ${((form.watch('price') || 0) - (form.watch('cost') || 0)).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
+                <FormField
+                  control={form.control}
+                  name="reason"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Reason (Optional)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Received stock / Damaged goods / Correction"
+                          className="min-h-[90px]"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            {/* Actions */}
+                <FormField
+                  control={form.control}
+                  name="idempotencyKey"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Idempotency Key (Optional)</FormLabel>
+                      <FormControl>
+                        <Input placeholder="optional-unique-key" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </CardContent>
+            </Card>
+
             <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
               <Button 
                 type="button" 
@@ -316,7 +167,7 @@ const ProductNewPage: React.FC = () => {
               </Button>
               <Button type="submit" className="w-full sm:w-auto">
                 <Save className="h-4 w-4 mr-2" />
-                Save Product
+                Apply Adjustment
               </Button>
             </div>
           </form>

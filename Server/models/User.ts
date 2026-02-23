@@ -1,8 +1,8 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * Address subdocument used for user addresses
- */
+
+
+
 export interface IAddress {
   street?: string;
   city?: string;
@@ -11,11 +11,11 @@ export interface IAddress {
   country?: string;
 }
 
-/**
- * A user of the POS system.  Users may be assigned multiple roles.  They can optionally be tied to one or more
- * stores.  Passwords are stored as hashes.  Status controls whether the
- * user may authenticate.
- */
+
+
+
+
+
 export interface IUser extends Document {
   fullName: string;
   email: string;

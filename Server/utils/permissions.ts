@@ -1,11 +1,11 @@
-/**
- * Default permissions for system roles
- * These permissions are assigned when creating new roles
- */
+
+
+
+
 export const ROLE_PERMISSIONS: Record<string, string[]> = {
-  // Super Admin has all permissions
+  
   superAdmin: ["*"],
-  // Admin can view and modify all modules and actions
+  
   admin: [
     "dashboard.view",
     "invoice.view",
@@ -45,7 +45,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "device.manage",
     "user.manage"
   ],
-  // Sales Rep can create and edit sales documents, but cannot modify inventory or settings
+  
   salesRep: [
     "dashboard.view",
     "invoice.view",
@@ -68,7 +68,7 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
     "product.view",
     "inventory.view"
   ],
-  // Stock Keeper can manage products and inventory, view documents
+  
   stockKeeper: [
     "dashboard.view",
     "product.view",
@@ -86,9 +86,9 @@ export const ROLE_PERMISSIONS: Record<string, string[]> = {
   ]
 };
 
-/**
- * Maps display role names to permission role keys
- */
+
+
+
 export const ROLE_NAME_MAP: Record<string, string> = {
   "Super Admin": "superAdmin",
   "Admin": "admin",
@@ -96,11 +96,11 @@ export const ROLE_NAME_MAP: Record<string, string> = {
   "Sales Representative": "salesRep"
 };
 
-/**
- * Get default permissions for a role
- * @param roleName - Display name of the role (e.g., "Admin", "Stock-Keeper")
- * @returns Array of permission keys for the role, or empty array if role not found
- */
+
+
+
+
+
 export const getDefaultPermissionsForRole = (roleName: string): string[] => {
   const roleKey = ROLE_NAME_MAP[roleName] || roleName.toLowerCase();
   return ROLE_PERMISSIONS[roleKey] || [];

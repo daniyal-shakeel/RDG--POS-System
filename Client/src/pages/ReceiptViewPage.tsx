@@ -104,16 +104,16 @@ const formatCurrency = (amount: number) =>
     currency: 'TTD',
   }).format(amount);
 
-// Helper function to format signature for display
+
 const formatSignatureSrc = (signature: string | undefined | null): string | undefined => {
   if (!signature) return undefined;
   
-  // If it already has a data URL prefix, return as is
+  
   if (signature.startsWith('data:')) {
     return signature;
   }
   
-  // Otherwise, add the data URL prefix for base64 image
+  
   return `data:image/png;base64,${signature}`;
 };
 
@@ -176,7 +176,7 @@ const ReceiptViewPage: React.FC = () => {
   return (
     <MainLayout>
       <div className="space-y-4 md:space-y-6">
-        {/* Header */}
+        {}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <Button 
@@ -206,7 +206,7 @@ const ReceiptViewPage: React.FC = () => {
               size="sm" 
               variant="outline"
               onClick={() => {
-                // Print functionality can be added here
+                
                 toast.info('Print functionality coming soon');
               }}
             >
@@ -217,7 +217,7 @@ const ReceiptViewPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          {/* Receipt Information */}
+          {}
           <Card>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -299,7 +299,7 @@ const ReceiptViewPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Customer Information */}
+          {}
           <Card>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -388,9 +388,9 @@ const ReceiptViewPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* Sales Representative and Items Grid */}
+        {}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          {/* Sales Representative */}
+          {}
           {receipt.salesRep && (
             <Card>
               <CardHeader className="pb-3 md:pb-4">
@@ -418,7 +418,7 @@ const ReceiptViewPage: React.FC = () => {
             </Card>
           )}
 
-          {/* Items Table */}
+          {}
           <Card className={receipt.salesRep ? '' : 'lg:col-span-2'}>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg">Items</CardTitle>
@@ -458,7 +458,7 @@ const ReceiptViewPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* Totals */}
+        {}
         <Card>
           <CardHeader className="pb-3 md:pb-4">
             <CardTitle className="text-base md:text-lg">Totals</CardTitle>
@@ -495,9 +495,9 @@ const ReceiptViewPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Signature and Metadata Grid */}
+        {}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          {/* Signature */}
+          {}
           {receipt.signature && (
             <Card>
               <CardHeader className="pb-3 md:pb-4">
@@ -513,7 +513,7 @@ const ReceiptViewPage: React.FC = () => {
                     onContextMenu={(e) => e.preventDefault()}
                     onError={(e) => {
                       console.error('Signature image failed to load');
-                      // Hide broken image icon
+                      
                       (e.target as HTMLImageElement).style.display = 'none';
                     }}
                   />
@@ -522,7 +522,7 @@ const ReceiptViewPage: React.FC = () => {
             </Card>
           )}
 
-          {/* Metadata */}
+          {}
           <Card>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg">Metadata</CardTitle>

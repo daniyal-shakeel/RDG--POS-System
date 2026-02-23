@@ -29,7 +29,7 @@ type InvoiceEdit = {
   createdAt: Date;
   status: 'draft' | 'pending' | 'partial' | 'paid' | 'overpaid';
   depositAdded: number;
-  depositReceived?: number; // Total deposit received (from invoice edit)
+  depositReceived?: number; 
   paymentMethod?: 'cash' | 'card' | 'bank_transfer' | 'cheque' | 'other';
   total: number;
   balanceDue: number;
@@ -68,8 +68,8 @@ export default function InvoiceEditsPage() {
       return;
     }
 
-    // Validation: Check if depositAdded > 0
-    // Use depositAdded (deposit from this specific edit) not depositReceived (total from base invoice)
+    
+    
     const depositAdded = edit.depositAdded ?? 0;
     if (depositAdded <= 0) {
       toast.error('Receipt cannot be generated with zero deposit.');
@@ -88,7 +88,7 @@ export default function InvoiceEditsPage() {
         const receiptNumber = response.data.receipt.receiptNumber;
         
         if (response.data.alreadyExists) {
-          // Receipt already exists for this invoice edit - show message with receipt number and action button
+          
           toast.info(
             response.data.message || `Receipt already generated for this invoice edit. Receipt Number: ${receiptNumber}`,
             {
@@ -100,7 +100,7 @@ export default function InvoiceEditsPage() {
             }
           );
         } else {
-          // New receipt created - show success message with action button
+          
           toast.success('Receipt generated successfully', {
             duration: 5000,
             action: {
@@ -109,7 +109,7 @@ export default function InvoiceEditsPage() {
             },
           });
         }
-        // Do not auto-navigate - user can click the button in the toast
+        
       } else {
         toast.error('Failed to generate receipt');
       }

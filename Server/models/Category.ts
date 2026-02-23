@@ -1,9 +1,9 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * Category groups products into logical sections.  A category may have a
- * parentCategory to support nested trees.
- */
+
+
+
+
 export interface ICategory extends Document {
   name: string;
   parentCategory?: Types.ObjectId;

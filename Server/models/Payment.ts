@@ -1,8 +1,8 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-/**
- * Individual deposit record within a payment
- */
+
+
+
 export interface IDepositRecord {
   amount: number;
   paymentMethod: "cash" | "card" | "bank_transfer" | "cheque" | "other";
@@ -13,17 +13,17 @@ export interface IDepositRecord {
   notes?: string;
 }
 
-/**
- * Payment model tracks payments made by customers against invoices.
- * 
- * Key fields:
- * 1. customerId - Who made the payment
- * 2. deposits - Array of individual deposit records (each with its own payment method)
- * 3. amount - Cumulative total amount (sum of all deposits)
- * 4. totalSpent - Cumulative total spent by customer (denormalized for quick access)
- * 5. invoiceIds - Array of invoices the payment is recorded against
- * 6. depositCount - Total number of deposits received across all invoices for this customer
- */
+
+
+
+
+
+
+
+
+
+
+
 export interface IPayment extends Document {
   customerId: Types.ObjectId;
   invoiceIds: Types.ObjectId[];
@@ -31,11 +31,11 @@ export interface IPayment extends Document {
   amount: number;
   totalSpent: number;
   depositCount: number;
-  paymentMethod?: "cash" | "card" | "bank_transfer" | "cheque" | "other"; // Legacy field - latest payment method
-  reference?: string; // Legacy field
-  notes?: string; // Legacy field
-  recordedBy?: Types.ObjectId; // Legacy field - latest recordedBy
-  paymentDate: Date; // Legacy field - latest deposit date
+  paymentMethod?: "cash" | "card" | "bank_transfer" | "cheque" | "other"; 
+  reference?: string; 
+  notes?: string; 
+  recordedBy?: Types.ObjectId; 
+  paymentDate: Date; 
   createdAt: Date;
   updatedAt: Date;
 }
@@ -97,16 +97,16 @@ const DepositRecordSchema = new Schema<IDepositRecord>(
 
 const PaymentSchema = new Schema<IPayment>(
   {
-    // Who made the payment - required, must reference a valid customer
+    
     customerId: {
       type: Schema.Types.ObjectId,
       ref: "Customer",
       required: [true, "Customer ID is required"],
       index: true,
-      unique: true, // One payment record per customer
+      unique: true, 
     },
-    // Array of invoices the payment is recorded against
-    // Same customer can deposit into multiple invoices, all tracked in one payment record
+    
+    
     invoiceIds: {
       type: [Schema.Types.ObjectId],
       ref: "Invoice",
@@ -118,7 +118,7 @@ const PaymentSchema = new Schema<IPayment>(
         message: "At least one invoice ID is required",
       },
     },
-    // Array of individual deposit records - each deposit has its own payment method
+    
     deposits: {
       type: [DepositRecordSchema],
       default: [],
@@ -129,7 +129,7 @@ const PaymentSchema = new Schema<IPayment>(
         message: "At least one deposit record is required",
       },
     },
-    // The payment amount - required, must be positive
+    
     amount: {
       type: Number,
       required: [true, "Payment amount is required"],
@@ -141,7 +141,7 @@ const PaymentSchema = new Schema<IPayment>(
         message: "Payment amount must be a valid positive number",
       },
     },
-    // Total spent by customer (cumulative) - denormalized for quick queries
+    
     totalSpent: {
       type: Number,
       required: [true, "Total spent is required"],
@@ -154,7 +154,7 @@ const PaymentSchema = new Schema<IPayment>(
         message: "Total spent must be a valid non-negative number",
       },
     },
-    // Total number of deposits received across all invoices for this customer
+    
     depositCount: {
       type: Number,
       required: [true, "Deposit count is required"],
@@ -167,7 +167,7 @@ const PaymentSchema = new Schema<IPayment>(
         message: "Deposit count must be a positive integer",
       },
     },
-    // Payment method - optional but must be one of allowed values
+    
     paymentMethod: {
       type: String,
       enum: {
@@ -176,31 +176,31 @@ const PaymentSchema = new Schema<IPayment>(
       },
       default: "cash",
     },
-    // Reference number (e.g., transaction ID, cheque number)
+    
     reference: {
       type: String,
       trim: true,
       maxlength: [100, "Reference cannot exceed 100 characters"],
     },
-    // Additional notes
+    
     notes: {
       type: String,
       trim: true,
       maxlength: [500, "Notes cannot exceed 500 characters"],
     },
-    // Who recorded the payment (user/staff)
+    
     recordedBy: {
       type: Schema.Types.ObjectId,
       ref: "User",
     },
-    // When the payment was made
+    
     paymentDate: {
       type: Date,
       required: [true, "Payment date is required"],
       default: Date.now,
       validate: {
         validator: function (value: Date) {
-          // Payment date cannot be in the future
+          
           return value <= new Date();
         },
         message: "Payment date cannot be in the future",
@@ -212,16 +212,16 @@ const PaymentSchema = new Schema<IPayment>(
   }
 );
 
-// Index for querying payments by customer (unique - one payment per customer)
-// customerId already has unique: true, so this index is implicit
 
-// Index for querying payments by invoice (using array field)
+
+
+
 PaymentSchema.index({ invoiceIds: 1 });
 
-// Index for querying payments by date range
+
 PaymentSchema.index({ paymentDate: -1 });
 
-// Index for querying payments by customer sorted by date
+
 PaymentSchema.index({ customerId: 1, paymentDate: -1 });
 
 export default model<IPayment>("Payment", PaymentSchema);

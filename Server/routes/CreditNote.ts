@@ -10,7 +10,7 @@ import { requirePermission } from "../middleware/permissions";
 
 const creditNoteRouter = express.Router();
 
-// All routes require authentication
+
 creditNoteRouter.use(authenticate);
 
 creditNoteRouter.post("/", requirePermission("creditNote.create"), createCreditNote);

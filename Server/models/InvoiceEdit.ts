@@ -1,8 +1,8 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-/**
- * Line items stored on an invoice edit.
- */
+
+
+
 export interface IInvoiceEditItem {
   productCode: string;
   description: string;
@@ -11,9 +11,9 @@ export interface IInvoiceEditItem {
   amount: number;
 }
 
-/**
- * Invoice edit captures updated invoice data while preserving history.
- */
+
+
+
 export interface IInvoiceEdit extends Document {
   invoiceReference: string;
   baseInvoiceId: Types.ObjectId;

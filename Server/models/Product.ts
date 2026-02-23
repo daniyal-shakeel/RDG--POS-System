@@ -1,10 +1,10 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * Product represents a sellable item.  It references a category and may
- * optionally refer to a tax profile.  Products can be marked as active
- * or archived to remove them from catalog listings without deletion.
- */
+
+
+
+
+
 export interface IProduct extends Document {
   name: string;
   sku: string;

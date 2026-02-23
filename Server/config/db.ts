@@ -8,7 +8,7 @@ const connectDB = async () => {
         const url = new URL(mongoUri.replace('mongodb://', 'http://'));
         const isLocalhost = url.hostname === 'localhost' || url.hostname === '127.0.0.1';
 
-        // Only use auth for non-local MongoDB (local Docker Mongo typically has no auth)
+        
         const user = process.env.MONGODB_USER;
         const password = process.env.MONGODB_PASSWORD;
         const authSource = process.env.MONGODB_AUTH_SOURCE || 'admin';

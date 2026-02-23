@@ -1,9 +1,9 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * InventoryItem tracks the quantity of a product (or variant) at a specific
- * store.  It also tracks reserved quantities and reorder thresholds.
- */
+
+
+
+
 export interface IInventoryItem extends Document {
   store: Types.ObjectId;
   product: Types.ObjectId;

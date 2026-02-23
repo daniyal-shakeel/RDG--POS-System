@@ -1,12 +1,12 @@
-/**
- * Estimate statuses matching the server model definition
- * Source: Server/models/Estimate.ts
- */
+
+
+
+
 export type EstimateStatus = 'draft' | 'pending' | 'accepted' | 'converted' | 'expired';
 
-/**
- * Human-readable labels for estimate statuses
- */
+
+
+
 export const ESTIMATE_STATUS_LABELS: Record<EstimateStatus, string> = {
   draft: 'Draft',
   pending: 'Pending',
@@ -15,10 +15,10 @@ export const ESTIMATE_STATUS_LABELS: Record<EstimateStatus, string> = {
   expired: 'Expired',
 };
 
-/**
- * Filter options for estimate status filters
- * Includes "all" option for showing all statuses
- */
+
+
+
+
 export const ESTIMATE_STATUS_FILTER_OPTIONS = [
   { value: 'all', label: 'All Status' },
   { value: 'draft', label: ESTIMATE_STATUS_LABELS.draft },

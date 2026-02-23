@@ -1,16 +1,31 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5500';
 
-// Create axios instance
+const isBrowser = typeof window !== 'undefined';
+const isLocalhost = isBrowser && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const isStaging = import.meta.env.MODE === 'staging';
+
+const API_BASE_URL = (() => {
+  if (isStaging) {
+    return import.meta.env.VITE_NGROK_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || 'http://localhost:5500';
+  }
+  if (isBrowser && !isLocalhost) {
+    
+    return import.meta.env.VITE_NGROK_API_BASE_URL || import.meta.env.VITE_API_BASE_URL || window.location.origin;
+  }
+  return import.meta.env.VITE_API_BASE_URL || 'http://localhost:5500';
+})();
+
+
 export const api = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 
-// Request interceptor to add token to requests
+
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
@@ -24,7 +39,7 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor to handle errors
+
 api.interceptors.response.use(
   (response) => response,
   (error) => {
@@ -32,11 +47,11 @@ api.interceptors.response.use(
       const url = error.config?.url ?? '';
       const isLogoutEndpoint = url.includes('/auth/logout');
       const isLoginEndpoint = url.includes('/auth/login');
-      // Skip redirect for logout (handled by logout) and login (page handles error, no reload)
+      
       if (isLogoutEndpoint || isLoginEndpoint) {
         return Promise.reject(error);
       }
-      // Token expired or invalid - clear token and redirect to login
+      
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

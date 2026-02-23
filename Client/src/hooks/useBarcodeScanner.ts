@@ -16,10 +16,10 @@ export function useBarcodeScanner(
   const [lastSymbology, setLastSymbology] = useState<string | null>(null);
 
   useEffect(() => {
-    // Subscribe to connection status
+    
     const unsubscribeStatus = barcodeScanner.onStatusChange(setIsConnected);
 
-    // Subscribe to scans
+    
     const unsubscribeScan = barcodeScanner.onScan((barcode, symbology) => {
       setLastBarcode(barcode);
       setLastSymbology(symbology);

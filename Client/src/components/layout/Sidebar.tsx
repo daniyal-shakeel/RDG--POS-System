@@ -9,6 +9,7 @@ import {
   FileCheck,
   Users,
   Package,
+  Truck,
   Settings,
   LogOut,
   Smartphone,
@@ -34,7 +35,7 @@ const navItemsConfig = [
       'creditNote.view', 'creditNote.*',
       'refund.view', 'refund.*',
       'estimate.view', 'estimate.*'
-    ] // Dashboard visible if user has access to documents/customers (not just inventory)
+    ] 
   },
   { 
     path: '/invoices', 
@@ -84,11 +85,17 @@ const navItemsConfig = [
     icon: Package,
     permissions: ['inventory.view', 'inventory.*', 'product.view', 'product.*']
   },
+  {
+    path: '/shipments',
+    label: 'Shipments',
+    icon: Truck,
+    permissions: ['mrpeasy.view', 'mrpeasy.*', 'inventory.view', 'inventory.*']
+  },
   { 
     path: '/settings', 
     label: 'Settings', 
     icon: Settings,
-    permissions: ['settings.view'] // Settings visible to users with settings.view permission
+    permissions: ['settings.view'] 
   }
 ];
 
@@ -104,15 +111,15 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
   const { hasAnyPermission } = usePermissions();
 
   const handleLogout = () => {
-    // Navigate immediately for instant redirect
+    
     navigate('/login', { replace: true });
-    // Clear state in background (don't wait for API call)
+    
     logout().catch(() => {
-      // Ignore errors - we've already navigated away
+      
     });
   };
 
-  // Filter navigation items based on permissions
+  
   const navItems = useMemo(() => {
     if (!user) {
       return [];
@@ -122,25 +129,25 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
     const userRole = user?.role;
     const originalRole = user?.originalRole;
     
-    // Super Admin: Only check by "*" permission or originalRole === 'Super Admin'
-    // Give super admin access to everything - no permission checks
+    
+    
     const isSuperAdmin = 
       userPermissions.includes('*') || 
       originalRole === 'Super Admin';
     
-    // Super Admin sees ALL items - no permission checks
+    
     if (isSuperAdmin) {
       return navItemsConfig;
     }
     
-    // For other users, check permissions
+    
     return navItemsConfig.filter(item => {
-      // If no permissions required, show to all authenticated users
+      
       if (!item.permissions || item.permissions.length === 0) {
         return true;
       }
       
-      // Check if user has any of the required permissions
+      
       return hasAnyPermission(item.permissions);
     });
   }, [hasAnyPermission, user]);
@@ -150,7 +157,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
       "fixed left-0 top-0 z-40 h-screen bg-sidebar border-r border-sidebar-border flex flex-col transition-all duration-300",
       isCollapsed ? "w-16" : "w-56 xl:w-64"
     )}>
-      {/* Logo & Minimize Button */}
+      {}
       <div className="p-4 xl:p-4 border-b border-sidebar-border flex items-center justify-between">
         {!isCollapsed && (
           <>
@@ -178,7 +185,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
         </button>
       </div>
 
-      {/* Device Status */}
+      {}
       {!isCollapsed && (
         <div className="px-3 xl:px-4 py-2 xl:py-3 border-b border-sidebar-border">
           <div className="flex items-center gap-3 xl:gap-4 text-xs">
@@ -206,7 +213,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
         </div>
       )}
 
-      {/* Navigation */}
+      {}
       <nav className="flex-1  p-3 xl:p-4 space-y-0.5 xl:space-y-1">
         {navItems.map(item => {
           const Icon = item.icon;
@@ -232,7 +239,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
         })}
       </nav>
 
-      {/* User Profile */}
+      {}
       {!isCollapsed && (
         <div className="p-3 xl:p-4 border-t border-sidebar-border">
           <div className="flex items-center gap-2 xl:gap-3 mb-2 xl:mb-3">
@@ -248,7 +255,7 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
               <p className="text-[10px] xl:text-xs text-muted-foreground capitalize">
                 {user?.originalRole || (() => {
                   if (!user?.role) return 'Not logged in';
-                  // Map frontend role back to display name if originalRole not available
+                  
                   const roleDisplayMap: Record<string, string> = {
                     'super_admin': 'Super Admin',
                     'admin': 'Admin',

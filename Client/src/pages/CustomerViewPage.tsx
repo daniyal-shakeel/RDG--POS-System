@@ -40,7 +40,7 @@ interface BackendCustomer {
   shippingAddress?: IAddress;
 }
 
-// Helper function to format address object to string
+
 const formatAddress = (address?: IAddress): string => {
   if (!address) return 'N/A';
   
@@ -77,7 +77,7 @@ const CustomerViewPage: React.FC = () => {
         const response = await api.get(`/api/v1/customer/${id}`);
         const backendCustomer: BackendCustomer = response.data.customer;
         
-        // Transform backend data to frontend Customer type
+        
         const transformedCustomer: Customer = {
           id: backendCustomer._id,
           name: backendCustomer.name,
@@ -154,7 +154,7 @@ const CustomerViewPage: React.FC = () => {
   return (
     <MainLayout>
       <div className="space-y-4 md:space-y-6">
-        {/* Header */}
+        {}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <Button 
@@ -197,7 +197,7 @@ const CustomerViewPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Stats Cards */}
+        {}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           <Card>
             <CardContent className="p-3 md:p-4">
@@ -245,7 +245,7 @@ const CustomerViewPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          {/* Contact Information */}
+          {}
           <Card>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg">Contact Information</CardTitle>
@@ -289,7 +289,7 @@ const CustomerViewPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Recent Orders */}
+          {}
           <Card>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg">Recent Orders</CardTitle>
@@ -329,7 +329,7 @@ const CustomerViewPage: React.FC = () => {
         </div>
       </div>
 
-      {/* Delete Confirmation Dialog */}
+      {}
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>

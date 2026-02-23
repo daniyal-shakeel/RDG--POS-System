@@ -1,13 +1,13 @@
 export type DocumentType = 'invoice' | 'receipt' | 'credit_note' | 'refund' | 'estimate';
 
-// Per-document-type statuses
+
 export type EstimateStatus = 'draft' | 'pending' | 'accepted' | 'converted' | 'expired';
 export type InvoiceStatus = 'draft' | 'pending' | 'partial' | 'paid' | 'overpaid';
 export type ReceiptStatus = 'draft' | 'completed';
 export type CreditNoteStatus = 'DRAFT' | 'APPROVED';
 export type RefundStatus = 'DRAFT' | 'REFUNDED';
 
-// Combined status type for documents
+
 export type DocumentStatus =
   | EstimateStatus
   | InvoiceStatus
@@ -69,7 +69,7 @@ export interface User {
   status?: UserStatus;
   avatar?: string;
   permissions?: string[];
-  originalRole?: string; // Store original backend role name for display
+  originalRole?: string; 
 }
 
 export interface DeviceStatus {

@@ -30,9 +30,9 @@ function getRequestMeta(req: Request): RequestMeta {
   };
 }
 
-/**
- * Logs request metadata to a single file. Async, fire-and-forget — does not block the main thread.
- */
+
+
+
 export function logRequestAsync(req: Request): void {
   console.log("Request is logged in logRequestAsync!")
   const meta = getRequestMeta(req);

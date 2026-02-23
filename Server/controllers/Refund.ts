@@ -18,9 +18,9 @@ type IncomingProduct = {
   price?: number;
 };
 
-/**
- * Generate unique refund number in format REF-XXXX-XXXX
- */
+
+
+
 const generateRefundNumber = async (): Promise<string> => {
   let attempts = 0;
   while (attempts < 5) {
@@ -35,9 +35,9 @@ const generateRefundNumber = async (): Promise<string> => {
   throw new Error("Unable to generate unique refund number");
 };
 
-/**
- * Validate and normalize refund product
- */
+
+
+
 const normalizeAndValidateProduct = (
   product: IncomingProduct,
   index: number
@@ -49,7 +49,7 @@ const normalizeAndValidateProduct = (
 } => {
   const errors: string[] = [];
 
-  // Validate productCode (required)
+  
   const productCodeValidation = validateString(product.productCode, {
     required: true,
     fieldName: "productCode",
@@ -58,13 +58,13 @@ const normalizeAndValidateProduct = (
     errors.push(`Product ${index + 1}: ${productCodeValidation.error}`);
   }
 
-  // Validate quantity (required, must be > 0)
+  
   const quantity = Number(product.quantity ?? 0);
   if (!Number.isFinite(quantity) || quantity <= 0) {
     errors.push(`Product ${index + 1}: quantity must be a positive number`);
   }
 
-  // Validate price (required, must be >= 0)
+  
   const price = Number(product.price ?? 0);
   if (!Number.isFinite(price) || price < 0) {
     errors.push(`Product ${index + 1}: price must be a non-negative number`);
@@ -82,9 +82,9 @@ const normalizeAndValidateProduct = (
   };
 };
 
-/**
- * Create a new refund
- */
+
+
+
 export const createRefund = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user) {
@@ -102,12 +102,12 @@ export const createRefund = async (req: AuthRequest, res: Response) => {
       saveDraft = false,
     } = req.body || {};
 
-    // Validate source
+    
     if (!source || (source !== 'FROM_CREDITNOTE' && source !== 'STANDALONE')) {
       return res.status(400).json({ message: "source must be either 'FROM_CREDITNOTE' or 'STANDALONE'" });
     }
 
-    // Validate creditNoteId if source is FROM_CREDITNOTE
+    
     if (source === 'FROM_CREDITNOTE') {
       if (!creditNoteId || !Types.ObjectId.isValid(creditNoteId)) {
         return res.status(400).json({ message: "Valid creditNoteId is required when source is FROM_CREDITNOTE" });
@@ -118,7 +118,7 @@ export const createRefund = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Validate customerId
+    
     if (!customerId || !Types.ObjectId.isValid(customerId)) {
       return res.status(400).json({ message: "Valid customerId is required" });
     }
@@ -128,7 +128,7 @@ export const createRefund = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    // Validate salesRepId
+    
     if (!salesRepId || !Types.ObjectId.isValid(salesRepId)) {
       return res.status(400).json({ message: "Valid salesRepId is required" });
     }
@@ -138,7 +138,7 @@ export const createRefund = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "Sales representative not found" });
     }
 
-    // Verify sales rep has Sales Representative role
+    
     const salesRepRole = await Role.findOne({ name: "Sales Representative" }).lean();
     if (!salesRepRole) {
       return res.status(500).json({ message: "Sales representative role not configured" });
@@ -153,12 +153,12 @@ export const createRefund = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ message: "User is not a Sales Representative" });
     }
 
-    // Validate products
+    
     if (!Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ message: "At least one product is required" });
     }
 
-    // Normalize and validate all products
+    
     const normalizedProducts = [];
     for (let idx = 0; idx < products.length; idx++) {
       const product = products[idx] as IncomingProduct;
@@ -172,18 +172,18 @@ export const createRefund = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Validate signature
+    
     if (!salesRepSignature || typeof salesRepSignature !== "string" || salesRepSignature.trim().length === 0) {
       return res.status(400).json({ message: "salesRepSignature is required" });
     }
 
-    // Generate refund number
+    
     const refundNumber = await generateRefundNumber();
 
-    // Determine status based on saveDraft flag
+    
     const status = saveDraft === true ? "DRAFT" : "REFUNDED";
 
-    // Create refund
+    
     const refund = await Refund.create({
       refundNumber,
       source,
@@ -205,7 +205,7 @@ export const createRefund = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error("Create refund error:", error);
     
-    // Handle duplicate key error (refundNumber uniqueness)
+    
     if (error.code === 11000 || error.name === "MongoServerError") {
       return res.status(409).json({
         message: "Refund number already exists. Please try again.",
@@ -219,16 +219,16 @@ export const createRefund = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Get all refunds with pagination
- */
+
+
+
 export const getRefunds = async (req: AuthRequest, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
     const statusFilter = req.query.status as string | undefined;
 
-    // Build query
+    
     const query: any = {};
     if (statusFilter && statusFilter !== "all") {
       query.status = statusFilter.toUpperCase();
@@ -246,7 +246,7 @@ export const getRefunds = async (req: AuthRequest, res: Response) => {
       Refund.countDocuments(query),
     ]);
 
-    // Map refunds to response format
+    
     const mapped = refunds.map((ref: any) => {
       const customer = ref.customerId || {};
       const salesRep = ref.salesRepId || {};
@@ -289,9 +289,9 @@ export const getRefunds = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Get refund by ID
- */
+
+
+
 export const getRefundById = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -348,9 +348,9 @@ export const getRefundById = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Update a refund (only allowed for DRAFT status)
- */
+
+
+
 export const updateRefund = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user) {
@@ -362,20 +362,20 @@ export const updateRefund = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: "Invalid refund id" });
     }
 
-    // Find the refund first to check its status
+    
     const existingRefund = await Refund.findById(new Types.ObjectId(id)).lean();
     if (!existingRefund) {
       return res.status(404).json({ message: "Refund not found" });
     }
 
-    // Prevent editing REFUNDED refunds
+    
     if (existingRefund.status === "REFUNDED") {
       return res.status(403).json({
         message: "Refunded refunds cannot be edited",
       });
     }
 
-    // Only DRAFT refunds can be edited
+    
     if (existingRefund.status !== "DRAFT") {
       return res.status(400).json({
         message: `Refunds with status ${existingRefund.status} cannot be edited`,
@@ -393,14 +393,14 @@ export const updateRefund = async (req: AuthRequest, res: Response) => {
       saveDraft = false,
     } = req.body || {};
 
-    // Validate source if provided
+    
     if (source !== undefined) {
       if (source !== 'FROM_CREDITNOTE' && source !== 'STANDALONE') {
         return res.status(400).json({ message: "source must be either 'FROM_CREDITNOTE' or 'STANDALONE'" });
       }
     }
 
-    // Validate creditNoteId if source is FROM_CREDITNOTE
+    
     const finalSource = source || existingRefund.source;
     if (finalSource === 'FROM_CREDITNOTE') {
       const finalCreditNoteId = creditNoteId || existingRefund.creditNoteId;
@@ -413,7 +413,7 @@ export const updateRefund = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Validate customerId if provided
+    
     if (customerId) {
       if (!Types.ObjectId.isValid(customerId)) {
         return res.status(400).json({ message: "Valid customerId is required" });
@@ -424,7 +424,7 @@ export const updateRefund = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Validate salesRepId if provided
+    
     if (salesRepId) {
       if (!Types.ObjectId.isValid(salesRepId)) {
         return res.status(400).json({ message: "Valid salesRepId is required" });
@@ -434,7 +434,7 @@ export const updateRefund = async (req: AuthRequest, res: Response) => {
         return res.status(404).json({ message: "Sales representative not found" });
       }
 
-      // Verify sales rep has Sales Representative role
+      
       const salesRepRole = await Role.findOne({ name: "Sales Representative" }).lean();
       if (!salesRepRole) {
         return res.status(500).json({ message: "Sales representative role not configured" });
@@ -450,7 +450,7 @@ export const updateRefund = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Build update object
+    
     const updateData: any = {};
 
     if (products !== undefined) {
@@ -458,7 +458,7 @@ export const updateRefund = async (req: AuthRequest, res: Response) => {
         return res.status(400).json({ message: "At least one product is required" });
       }
 
-      // Normalize and validate all products
+      
       const normalizedProducts = [];
       for (let idx = 0; idx < products.length; idx++) {
         const product = products[idx] as IncomingProduct;
@@ -505,14 +505,14 @@ export const updateRefund = async (req: AuthRequest, res: Response) => {
       updateData.salesRepSignature = (salesRepSignature || "").trim();
     }
 
-    // Determine status based on saveDraft flag
+    
     if (saveDraft === true) {
       updateData.status = "DRAFT";
     } else if (saveDraft === false) {
       updateData.status = "REFUNDED";
     }
 
-    // Update the refund
+    
     const updatedRefund = await Refund.findByIdAndUpdate(
       new Types.ObjectId(id),
       { $set: updateData },

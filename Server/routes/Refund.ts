@@ -10,7 +10,7 @@ import { requirePermission } from "../middleware/permissions";
 
 const refundRouter = express.Router();
 
-// All routes require authentication
+
 refundRouter.use(authenticate);
 
 refundRouter.post("/", requirePermission("refund.create"), createRefund);

@@ -40,7 +40,7 @@ interface DocumentListPageProps {
   title: string;
 }
 
-// Company info for printing
+
 const COMPANY_INFO = {
   name: 'XYZ Company Ltd. Ltd.',
   address: '22 Macoya Road West, Macoya Industrial Estate, Tunapuna, Trinidad & Tobago',
@@ -153,16 +153,16 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
         const incoming = Array.isArray(response.data?.invoices)
           ? response.data.invoices
           : [];
-        // Map invoices from backend - all values are already calculated correctly
-        // Backend returns: total (with tax), balance (current balance), status (derived from balance)
+        
+        
         const mapped = incoming.map((inv: any) => {
-          // Backend returns the correct invoice total (subtotal + tax)
+          
           const total = Number(inv.total ?? 0);
-          // Backend returns the current balance (can be negative if overpaid)
+          
           const balance = Number(inv.balance ?? inv.balanceDue ?? 0);
-          // Deposit is the total received (total - balance, but backend may provide it directly)
+          
           const deposit = Number(inv.depositReceived ?? Math.max(total - balance, 0));
-          // Status is already correctly derived by backend based on balance
+          
           const status = inv.status || 'draft';
           
           return {
@@ -178,12 +178,12 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
               id: inv.customerId || '',
             },
             items: [],
-            subtotal: total, // For display, we use total since subtotal isn't returned in list
+            subtotal: total, 
             discount: 0,
             tax: 0,
-            total, // Invoice total WITH tax (from backend)
-            balanceDue: balance, // Current balance (from backend, can be negative)
-            deposit, // Total deposit received
+            total, 
+            balanceDue: balance, 
+            deposit, 
             salesRep: inv.salesRep || '',
           };
         });
@@ -225,7 +225,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
         const incoming = Array.isArray(response.data?.receipts)
           ? response.data.receipts
           : [];
-        // Map receipts from backend
+        
         const mapped = incoming.map((receipt: any) => {
           return {
             id: receipt.id || receipt.receiptId,
@@ -243,7 +243,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
             discount: 0,
             tax: receipt.tax || 0,
             total: receipt.total || 0,
-            balanceDue: 0, // Receipts are always paid
+            balanceDue: 0, 
             deposit: receipt.total || 0,
             salesRep: receipt.salesRepName || '',
             saleType: receipt.saleType || 'cash',
@@ -289,9 +289,9 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
         const incoming = Array.isArray(response.data?.creditNotes)
           ? response.data.creditNotes
           : [];
-        // Map credit notes from backend
+        
         const mapped = incoming.map((cn: any) => {
-          // Calculate totals from products
+          
           const subtotal = (cn.products || []).reduce(
             (sum: number, p: any) => sum + (Number(p.quantity || 0) * Number(p.price || 0)),
             0
@@ -360,9 +360,9 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
         const incoming = Array.isArray(response.data?.refunds)
           ? response.data.refunds
           : [];
-        // Map refunds from backend
+        
         const mapped = incoming.map((ref: any) => {
-          // Calculate totals from products
+          
           const subtotal = (ref.products || []).reduce(
             (sum: number, p: any) => sum + (Number(p.quantity || 0) * Number(p.price || 0)),
             0
@@ -416,7 +416,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
     fetchRefunds();
   }, [type, statusFilter]);
 
-  // Reset pagination when switching types
+  
   useEffect(() => {
     if (type === 'invoice') {
       setInvoicePage(0);
@@ -464,8 +464,8 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
       return;
     }
 
-    // Try to fetch the full estimate details before navigating so we have
-    // addresses, items, message, and signature available to prefill.
+    
+    
     try {
       const token = localStorage.getItem('token') || '';
       const response = await api.get(`/api/v1/estimate/${doc.refNumber}`, {
@@ -482,7 +482,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
       });
     } catch (error) {
       console.error('Convert to invoice fetch error:', error);
-      // Fallback to existing doc data if detail fetch fails
+      
       navigate(`/invoices/new`, {
         state: {
           convertFrom: doc,
@@ -493,7 +493,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
 
   const handleViewDocument = async (doc: any) => {
     if (doc.type === 'receipt') {
-      // Navigate to receipt view page (read-only)
+      
       navigate(`/receipts/${doc.id}/view`);
       return;
     }
@@ -535,8 +535,8 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
       }
     }
 
-    // For APPROVED credit notes, navigate to view page; for DRAFT, navigate to edit page
-    // For REFUNDED refunds, navigate to view page; for DRAFT, navigate to edit page
+    
+    
     if (type === 'credit_note' && doc.status === 'APPROVED') {
       navigate(`/credit-notes/${doc.id}/view`);
     } else if (type === 'refund' && doc.status === 'REFUNDED') {
@@ -560,15 +560,15 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
       return;
     }
 
-    // If printer is connected, use Bluetooth printer
+    
     if (isConnected) {
       try {
-        // Transform document to ReceiptData format
+        
         const receiptData: ReceiptData = {
           companyName: COMPANY_INFO.name,
           companyAddress: COMPANY_INFO.address,
           companyPhone: COMPANY_INFO.phone,
-          documentType: doc.type.replace('_', ' '), // e.g., "credit_note" -> "credit note"
+          documentType: doc.type.replace('_', ' '), 
           refNumber: doc.refNumber,
           date: format(doc.date, 'dd/MM/yyyy HH:mm'),
           customerName: doc.customer.name,
@@ -597,21 +597,21 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
         toast.error(error.message || 'Failed to print document. Please try again.');
       }
     } else {
-      // If printer not connected, use browser print (PDF)
+      
       printAsPDF(doc);
     }
   };
 
   const printAsPDF = (doc: any) => {
     try {
-      // Create a new window for printing
+      
       const printWindow = window.open('', '_blank');
       if (!printWindow) {
         toast.error('Please allow popups to print PDF');
         return;
       }
 
-      // Write HTML content with ReceiptPrintView rendered
+      
       printWindow.document.write(`
         <!DOCTYPE html>
         <html>
@@ -685,7 +685,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
   };
 
   const generateReceiptHTML = (doc: any): string => {
-    // Format all dates and currency values before generating HTML
+    
     const formattedDate = format(doc.date, 'dd/MM/yyyy HH:mm');
     const formattedDueDate = doc.dueDate ? format(doc.dueDate, 'dd/MM/yyyy') : '';
     const formattedPrintDate = format(new Date(), 'dd/MM/yyyy HH:mm:ss');
@@ -697,7 +697,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
       }).format(amount);
     };
 
-    // Format all currency values
+    
     const formattedItems = doc.items.map((item: any, index: number) => ({
       ...item,
       formattedUnitPrice: formatCurrency(item.unitPrice),
@@ -805,7 +805,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
   return (
     <MainLayout>
       <div className="space-y-4 sm:space-y-6 animate-fade-in">
-        {/* Header */}
+        {}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-display font-bold">{title}</h1>
@@ -826,7 +826,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
           )}
         </div>
 
-        {/* Filters */}
+        {}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -861,7 +861,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
           </Select>
         </div>
 
-        {/* Desktop Table */}
+        {}
         <div className="glass-card rounded-xl overflow-hidden hidden lg:block">
           <Table>
             <TableHeader>
@@ -931,7 +931,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
                     {type !== 'credit_note' && type !== 'refund' && (
                       <TableCell className="text-right text-sm">
                         {type === 'receipt' ? (
-                          // Receipt source logic
+                          
                           doc.saleType === 'cash' ? (
                             <span className="text-success">Cash</span>
                           ) : doc.saleType === 'invoice' && doc.invoiceId ? (
@@ -950,7 +950,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
                             <span className="text-success">Cash</span>
                           )
                         ) : (
-                          // Invoice/Estimate balance logic
+                          
                           doc.balanceDue > 0 ? (
                             <span className="text-warning font-medium">
                               {formatCurrency(doc.balanceDue)}
@@ -1046,7 +1046,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
           )}
         </div>
 
-        {/* Mobile Cards */}
+        {}
         <div className="lg:hidden space-y-3">
           {isLoading ? (
             Array.from({ length: 4 }).map((_, idx) => (
@@ -1101,7 +1101,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
                     <div>
                       <p className="text-muted-foreground">{type === 'receipt' ? 'Source' : 'Balance'}</p>
                       {type === 'receipt' ? (
-                        // Receipt source logic
+                        
                         doc.saleType === 'cash' ? (
                           <p className="font-medium text-success">Cash</p>
                         ) : doc.saleType === 'invoice' && doc.invoiceId ? (
@@ -1120,7 +1120,7 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
                           <p className="font-medium text-success">Cash</p>
                         )
                       ) : (
-                        // Invoice/Estimate balance logic
+                        
                         <p className={`font-medium ${doc.balanceDue > 0 ? 'text-warning' : doc.balanceDue < 0 ? 'text-info' : 'text-success'}`}>
                           {doc.balanceDue > 0 
                             ? formatCurrency(doc.balanceDue) 
@@ -1139,8 +1139,8 @@ export default function DocumentListPage({ type, title }: DocumentListPageProps)
                     className="flex-1 text-xs"
                       onClick={(e) => {
                       e.stopPropagation();
-                      // For APPROVED credit notes, navigate to view page; for DRAFT, navigate to edit page
-                      // For REFUNDED refunds, navigate to view page; for DRAFT, navigate to edit page
+                      
+                      
                 if (type === 'credit_note' && doc.status === 'APPROVED') {
                   navigate(`/credit-notes/${doc.id}/view`);
                 } else if (type === 'refund' && doc.status === 'REFUNDED') {

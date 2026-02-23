@@ -12,7 +12,7 @@ import { requirePermission } from "../middleware/permissions";
 
 const invoiceRouter = express.Router();
 
-// All routes require authentication
+
 invoiceRouter.use(authenticate);
 
 invoiceRouter.post("/", requirePermission("invoice.create"), createInvoice);

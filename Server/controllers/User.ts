@@ -12,7 +12,7 @@ type CreateUserBody = {
   email: string;
   password: string;
   phone?: string;
-  role: string; // Role name: "Admin", "Stock-Keeper", or "Sales Representative"
+  role: string; 
   address?: {
     street?: string;
     city?: string;
@@ -34,9 +34,9 @@ const mapUserForResponse = (user: any) => ({
   createdAt: user.createdAt,
 });
 
-/**
- * Validates password strength
- */
+
+
+
 const validatePassword = (
   password: any,
   required: boolean = false
@@ -70,12 +70,12 @@ const validatePassword = (
   return { isValid: true, value: trimmed };
 };
 
-/**
- * Create a new user (only super admin can do this)
- */
+
+
+
 const createUser = async (req: AuthRequest, res: Response) => {
   try {
-    // Verify super admin
+    
     if (!req.user || req.user.role !== "Super Admin") {
       return res.status(403).json({
         message: "Only super admin can create users",
@@ -84,7 +84,7 @@ const createUser = async (req: AuthRequest, res: Response) => {
 
     const body = req.body as CreateUserBody;
 
-    // Validate fullName
+    
     const nameValidation = validateName(body?.fullName, true);
     if (!nameValidation.isValid) {
       return res.status(400).json({
@@ -92,7 +92,7 @@ const createUser = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Validate email
+    
     const emailValidation = validateEmail(body?.email, true);
     if (!emailValidation.isValid) {
       return res.status(400).json({
@@ -100,7 +100,7 @@ const createUser = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Validate password
+    
     const passwordValidation = validatePassword(body?.password, true);
     if (!passwordValidation.isValid) {
       return res.status(400).json({
@@ -108,7 +108,7 @@ const createUser = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Validate phone if provided
+    
     let phoneValidation = null;
     if (body.phone) {
       phoneValidation = validatePhone(body.phone, false);
@@ -119,7 +119,7 @@ const createUser = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Validate address if provided
+    
     let addressValidation = null;
     if (body.address) {
       addressValidation = validateAddress(body.address, false);
@@ -130,7 +130,7 @@ const createUser = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Validate role
+    
     if (!body.role || typeof body.role !== "string") {
       return res.status(400).json({
         message: "Role is required",
@@ -148,7 +148,7 @@ const createUser = async (req: AuthRequest, res: Response) => {
     const sanitizedEmail = emailValidation.value!.toLowerCase().trim();
     const sanitizedPassword = passwordValidation.value!;
 
-    // Check if user already exists
+    
     const existingUser = await User.findOne({ email: sanitizedEmail }).lean();
     if (existingUser) {
       return res.status(409).json({
@@ -156,10 +156,10 @@ const createUser = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Find or create role
+    
     let role = await Role.findOne({ name: roleName });
     if (!role) {
-      // Create role with default permissions
+      
       const defaultPermissions = getDefaultPermissionsForRole(roleName);
 
       role = await Role.create({
@@ -169,10 +169,10 @@ const createUser = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Hash password
+    
     const passwordHash = await bcrypt.hash(sanitizedPassword, 10);
 
-    // Create user
+    
     const newUser = await User.create({
       fullName: nameValidation.value!,
       email: sanitizedEmail,
@@ -183,7 +183,7 @@ const createUser = async (req: AuthRequest, res: Response) => {
       status: "active",
     });
 
-    // Populate role for response
+    
     const userWithRole = await User.findById(newUser._id)
       .populate("roleIds", "name permissionKeys")
       .lean();
@@ -211,13 +211,13 @@ const createUser = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Get all users (requires user.manage permission - checked by middleware)
- */
+
+
+
 const getUsers = async (req: AuthRequest, res: Response) => {
   try {
-    // Permission check is handled by requirePermission middleware in routes
-    // User is guaranteed to have user.manage permission at this point
+    
+    
     const allowedRoleFilters = ["Admin", "Stock-Keeper", "Sales Representative"];
     const roleFromQuery =
       typeof req.query?.role === "string" ? req.query.role.trim() : "";
@@ -267,12 +267,12 @@ const getUsers = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Suspend a user (only super admin can do this)
- */
+
+
+
 const suspendUser = async (req: AuthRequest, res: Response) => {
   try {
-    // Verify super admin
+    
     if (!req.user || req.user.role !== "Super Admin") {
       return res.status(403).json({
         message: "Only super admin can suspend users",
@@ -281,21 +281,21 @@ const suspendUser = async (req: AuthRequest, res: Response) => {
 
     const { id } = req.params;
 
-    // Validate user ID
+    
     if (!id || typeof id !== "string") {
       return res.status(400).json({
         message: "User ID is required",
       });
     }
 
-    // Validate ObjectId format
+    
     if (!Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         message: "Invalid user ID format",
       });
     }
 
-    // Check if trying to suspend super admin (should not be allowed)
+    
     const user = await User.findById(id).lean();
     if (!user) {
       return res.status(404).json({
@@ -303,14 +303,14 @@ const suspendUser = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Check if user is already suspended
+    
     if (user.status === "suspended") {
       return res.status(400).json({
         message: "User is already suspended",
       });
     }
 
-    // Update user status to suspended
+    
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { status: "suspended" },
@@ -343,12 +343,12 @@ const suspendUser = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Unsuspend/Activate a user (only super admin can do this)
- */
+
+
+
 const unsuspendUser = async (req: AuthRequest, res: Response) => {
   try {
-    // Verify super admin
+    
     if (!req.user || req.user.role !== "Super Admin") {
       return res.status(403).json({
         message: "Only super admin can unsuspend users",
@@ -357,14 +357,14 @@ const unsuspendUser = async (req: AuthRequest, res: Response) => {
 
     const { id } = req.params;
 
-    // Validate user ID
+    
     if (!id || typeof id !== "string") {
       return res.status(400).json({
         message: "User ID is required",
       });
     }
 
-    // Validate ObjectId format
+    
     if (!Types.ObjectId.isValid(id)) {
       return res.status(400).json({
         message: "Invalid user ID format",
@@ -378,14 +378,14 @@ const unsuspendUser = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Check if user is not suspended
+    
     if (user.status !== "suspended") {
       return res.status(400).json({
         message: `User is not suspended. Current status: ${user.status}`,
       });
     }
 
-    // Update user status to inactive (they need to log in to become active)
+    
     const updatedUser = await User.findByIdAndUpdate(
       id,
       { status: "inactive" },

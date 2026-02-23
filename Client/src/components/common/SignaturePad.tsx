@@ -7,7 +7,7 @@ interface SignaturePadProps {
   onSave: (signature: string) => void;
   onClear: () => void;
   className?: string;
-  initialSignature?: string; // Base64 string (without data URL prefix) to display on load
+  initialSignature?: string; 
 }
 
 export function SignaturePad({ onSave, onClear, className, initialSignature }: SignaturePadProps) {
@@ -26,7 +26,7 @@ export function SignaturePad({ onSave, onClear, className, initialSignature }: S
     setIsDrawing(true);
     setHasSignature(true);
     
-    // If signature was already accepted and user is drawing again, reset accepted state
+    
     if (isAccepted) {
       setIsAccepted(false);
     }
@@ -76,14 +76,14 @@ export function SignaturePad({ onSave, onClear, className, initialSignature }: S
     onClear();
   };
 
-  // Load existing signature on mount
+  
   useEffect(() => {
     if (initialSignature && canvasRef.current) {
       const canvas = canvasRef.current;
       const ctx = canvas.getContext('2d');
       if (ctx) {
         const img = new Image();
-        // Reconstruct data URL if needed (in case initialSignature is just base64)
+        
         const dataUrl = initialSignature.startsWith('data:')
           ? initialSignature
           : `data:image/png;base64,${initialSignature}`;
@@ -103,17 +103,17 @@ export function SignaturePad({ onSave, onClear, className, initialSignature }: S
     const canvas = canvasRef.current;
     if (!canvas || !hasSignature) return;
 
-    // Convert canvas to base64 data URL (format: data:image/png;base64,<base64-string>)
+    
     const dataUrl = canvas.toDataURL('image/png');
     
-    // Extract just the base64 portion (remove 'data:image/png;base64,' prefix)
-    // This makes it cleaner for API transmission - backend can prepend the prefix if needed
+    
+    
     const base64String = dataUrl.split(',')[1] || dataUrl;
     
-    // Save the base64 string for API transmission
+    
     onSave(base64String);
     
-    // Mark as accepted and show success message
+    
     setIsAccepted(true);
     toast.success('Signature accepted and saved');
   };
@@ -125,14 +125,14 @@ export function SignaturePad({ onSave, onClear, className, initialSignature }: S
       return;
     }
 
-    // Convert canvas to blob and download
+    
     canvas.toBlob((blob) => {
       if (!blob) {
         toast.error('Failed to generate signature image');
         return;
       }
 
-      // Create download link
+      
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

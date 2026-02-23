@@ -51,7 +51,7 @@ const makeCustomerCode = () => {
 
 const createCustomer = async (req: AuthRequest, res: Response) => {
   try {
-    // Check permissions
+    
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -65,25 +65,25 @@ const createCustomer = async (req: AuthRequest, res: Response) => {
 
     const body = req.body as CreateCustomerBody;
 
-    // Validate name (letters only)
+    
     const nameValidation = validateName(body?.name, true);
     if (!nameValidation.isValid) {
       return res.status(400).json({ message: nameValidation.error || "Invalid name" });
     }
 
-    // Validate email format
+    
     const emailValidation = validateEmail(body?.email, true);
     if (!emailValidation.isValid) {
       return res.status(400).json({ message: emailValidation.error || "Invalid email" });
     }
 
-    // Validate phone format
+    
     const phoneValidation = validatePhone(body?.phone, true);
     if (!phoneValidation.isValid) {
       return res.status(400).json({ message: phoneValidation.error || "Invalid phone" });
     }
 
-    // Validate billing address if provided
+    
     let billingAddressValidation = null;
     if (body.billingAddress) {
       billingAddressValidation = validateAddress(body.billingAddress, false);
@@ -92,7 +92,7 @@ const createCustomer = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Validate shipping address if provided
+    
     let shippingAddressValidation = null;
     if (body.shippingAddress) {
       shippingAddressValidation = validateAddress(body.shippingAddress, false);
@@ -101,15 +101,15 @@ const createCustomer = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Always generate a customer code and ensure it's unique
+    
     let customerCode = makeCustomerCode();
     
-    // Check if generated code exists in database
+    
     let codeExists = await Customer.findOne({
       customerCode: customerCode,
     });
 
-    // If code exists, generate a new one (up to 5 attempts)
+    
     let attempts = 0;
     while (codeExists && attempts < 5) {
       customerCode = makeCustomerCode();
@@ -119,14 +119,14 @@ const createCustomer = async (req: AuthRequest, res: Response) => {
       attempts++;
     }
 
-    // If still exists after attempts, return error
+    
     if (codeExists) {
       return res.status(500).json({
         message: "Unable to generate unique customer code. Please try again.",
       });
     }
 
-    // Check for existing customer with same email
+    
     let existingCustomer = await Customer.findOne({
       email: emailValidation.value,
     }).lean();
@@ -136,7 +136,7 @@ const createCustomer = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Check for existing customer with same phone
+    
     existingCustomer = await Customer.findOne({
       phone: phoneValidation.value,
     }).lean();
@@ -146,8 +146,8 @@ const createCustomer = async (req: AuthRequest, res: Response) => {
       });
     }
 
-    // Create the customer with the validated/generated code
-    // If shipping address not provided, use billing address
+    
+    
     const billingAddress = billingAddressValidation?.value || undefined;
     const shippingAddress = shippingAddressValidation?.value || billingAddress;
     const salesRepValidation = validateObjectId(body?.salesRep ?? "", false);
@@ -192,7 +192,7 @@ const createCustomer = async (req: AuthRequest, res: Response) => {
       .status(201)
       .json({ message: "Customer created successfully", customer: newCustomer });
   } catch (error: any) {
-    // Handle duplicate key error (MongoDB unique constraint)
+    
     if (error.code === 11000) {
       return res.status(409).json({
         message: "Customer code already exists",
@@ -208,7 +208,7 @@ const createCustomer = async (req: AuthRequest, res: Response) => {
 
 const getCustomers = async (req: AuthRequest, res: Response) => {
   try {
-    // Check permissions
+    
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -260,7 +260,7 @@ const getCustomers = async (req: AuthRequest, res: Response) => {
 
 const getCustomerById = async (req: AuthRequest, res: Response) => {
   try {
-    // Check permissions
+    
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -324,7 +324,7 @@ const getCustomerById = async (req: AuthRequest, res: Response) => {
 
 const updateCustomer = async (req: AuthRequest, res: Response) => {
   try {
-    // Validate token from Authorization header (in addition to middleware)
+    
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Unauthorized: missing token" });
@@ -343,7 +343,7 @@ const updateCustomer = async (req: AuthRequest, res: Response) => {
       return res.status(401).json({ message });
     }
 
-    // Check permissions
+    
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }
@@ -370,7 +370,7 @@ const updateCustomer = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    // Validate and sanitize inputs that were provided
+    
     const sanitized: Partial<CreateCustomerBody> = {};
     let salesRepProvided = false;
     let salesRepId: Types.ObjectId | null = null;
@@ -559,7 +559,7 @@ const updateCustomer = async (req: AuthRequest, res: Response) => {
 
 const deleteCustomer = async (req: AuthRequest, res: Response) => {
   try {
-    // Check permissions
+    
     if (!req.user) {
       return res.status(401).json({ message: "Unauthorized" });
     }

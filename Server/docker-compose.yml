@@ -1,3 +1,5 @@
+name: pos-server
+
 services:
   redis:
     image: redis:7-alpine

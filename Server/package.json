@@ -4,7 +4,7 @@
   "description": "",
   "main": "dist/app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "tsx mrpeasy/__tests__/inventoryService.test.ts && tsx mrpeasy/__tests__/inventoryRoutes.integration.test.ts",
     "build": "tsc",
     "start": "node dist/app.js",
     "dev": "tsx watch app.ts",

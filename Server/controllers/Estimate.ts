@@ -490,11 +490,11 @@ const updateEstimateStatus = async (req: AuthRequest, res: Response) => {
   });
 };
 
-/**
- * Convert an estimate into an invoice.
- * For now, this is a placeholder that validates permission and responds
- * with the intention. Implement actual conversion logic when available.
- */
+
+
+
+
+
 const convertEstimateToInvoice = async (req: AuthRequest, res: Response) => {
   const reference =
     typeof req.params?.reference === "string" ? req.params.reference.trim() : "";

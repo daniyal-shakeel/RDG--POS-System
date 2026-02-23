@@ -1,8 +1,8 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * IRefundProduct models a product on a refund
- */
+
+
+
 export interface IRefundProduct {
   productCode: string;
   description?: string;
@@ -10,16 +10,16 @@ export interface IRefundProduct {
   price: number;
 }
 
-/**
- * Refund represents a refund issued to a customer
- * Can be created standalone or from a credit note
- */
+
+
+
+
 export interface IRefund extends Document {
-  refundNumber: string; // Unique reference (format: REF-XXXX-XXXX)
+  refundNumber: string; 
   source: 'FROM_CREDITNOTE' | 'STANDALONE';
   customerId: Types.ObjectId;
   salesRepId: Types.ObjectId;
-  creditNoteId?: Types.ObjectId; // Reference to credit note if source is FROM_CREDITNOTE
+  creditNoteId?: Types.ObjectId; 
   products: IRefundProduct[];
   message?: string;
   salesRepSignature: string;
@@ -32,8 +32,8 @@ const RefundProductSchema = new Schema<IRefundProduct>(
   {
     productCode: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
-    quantity: { type: Number, required: true, min: 0.01 }, // Must be > 0
-    price: { type: Number, required: true, min: 0 }, // Must be >= 0
+    quantity: { type: Number, required: true, min: 0.01 }, 
+    price: { type: Number, required: true, min: 0 }, 
   },
   { _id: false }
 );

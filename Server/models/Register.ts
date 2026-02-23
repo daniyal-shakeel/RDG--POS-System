@@ -1,10 +1,10 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * Register represents a point of sale terminal within a store.  Each
- * register can be configured with a device type, tax profile and receipt
- * template.  Registers may be deactivated.
- */
+
+
+
+
+
 export interface IRegister extends Document {
   store: Types.ObjectId;
   name: string;

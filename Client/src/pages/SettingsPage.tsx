@@ -22,18 +22,36 @@ import {
   Save
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { useNavigate } from 'react-router-dom';
+import { getMrpeasyInventory } from '@/services/mrpeasy';
 
 export default function SettingsPage() {
   const { user, deviceStatus } = usePOS();
+  const navigate = useNavigate();
 
   const handleSave = () => {
     toast.success('Settings saved successfully');
   };
 
+  const handleMrpeasySync = async () => {
+    try {
+      const result = await getMrpeasyInventory({ limit: 200, offset: 0 });
+      const count = Array.isArray(result.data) ? result.data.length : 0;
+      toast.success(`MRPEasy sync completed (${count} products)`);
+      navigate('/inventory', { state: { forceMrpeasySync: true } });
+    } catch (error: any) {
+      const message =
+        error?.response?.data?.error ||
+        error?.message ||
+        'Failed to sync MRPEasy inventory';
+      toast.error(message);
+    }
+  };
+
   return (
     <MainLayout>
       <div className="space-y-4 sm:space-y-6 animate-fade-in max-w-4xl">
-        {/* Header */}
+        {}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-display font-bold">Settings</h1>
@@ -47,7 +65,7 @@ export default function SettingsPage() {
           </Button>
         </div>
 
-        {/* User Profile */}
+        {}
         <div className="glass-card rounded-xl p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-4 sm:mb-6">
             <User className="h-5 w-5 text-primary" />
@@ -79,7 +97,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Company Info */}
+        {}
         <div className="glass-card rounded-xl p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-4 sm:mb-6">
             <Building className="h-5 w-5 text-primary" />
@@ -117,7 +135,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Device Configuration */}
+        {}
         <div className="glass-card rounded-xl p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-4 sm:mb-6">
             <Smartphone className="h-5 w-5 text-primary" />
@@ -125,7 +143,7 @@ export default function SettingsPage() {
           </div>
           
           <div className="space-y-4 sm:space-y-6">
-            {/* CT60 */}
+            {}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg bg-muted/50 gap-3">
               <div className="flex items-center gap-4">
                 <Smartphone className="h-6 w-6" />
@@ -149,7 +167,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* RP4 with Bluetooth Connection */}
+            {}
             <BluetoothPrinterCard />
 
             <Separator />
@@ -177,7 +195,7 @@ export default function SettingsPage() {
           </div>
         </div>
 
-        {/* Integrations */}
+        {}
         <div className="glass-card rounded-xl p-4 sm:p-6">
           <div className="flex items-center gap-3 mb-4 sm:mb-6">
             <Database className="h-5 w-5 text-primary" />
@@ -185,7 +203,7 @@ export default function SettingsPage() {
           </div>
 
           <div className="space-y-4">
-            {/* QuickBooks */}
+            {}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg bg-muted/50 gap-3">
               <div>
                 <p className="font-medium text-sm sm:text-base">QuickBooks Online Advanced</p>
@@ -198,14 +216,19 @@ export default function SettingsPage() {
                   <span className="h-2 w-2 rounded-full bg-success" />
                   Connected
                 </span>
-                <Button variant="outline" size="sm" className="gap-2 w-full sm:w-auto">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2 w-full sm:w-auto"
+                  onClick={handleMrpeasySync}
+                >
                   <RefreshCw className="h-4 w-4" />
                   Sync Now
                 </Button>
               </div>
             </div>
 
-            {/* MRPEasy */}
+            {}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg bg-muted/50 gap-3">
               <div>
                 <p className="font-medium text-sm sm:text-base">MRPEasy Starter</p>
@@ -225,7 +248,7 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* SharePoint */}
+            {}
             <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-lg bg-muted/50 gap-3">
               <div>
                 <p className="font-medium text-sm sm:text-base">SharePoint / Excel Export</p>

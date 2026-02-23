@@ -84,7 +84,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
   const [salesRepsError, setSalesRepsError] = useState<string | null>(null);
   const [hasFetchedSalesReps, setHasFetchedSalesReps] = useState(false);
   const salesRepsAbortRef = useRef<AbortController | null>(null);
-  // Signature stored as base64 string (without data URL prefix) - ready for API transmission
+  
   const [signature, setSignature] = useState<string | undefined>();
   const [deposit, setDeposit] = useState(0);
   const [existingDeposit, setExistingDeposit] = useState(0);
@@ -214,7 +214,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       ? invoice.items
       : [];
     
-    // Get customer info from the backend response
+    
     const customerId = invoice.customerId || '';
     const customerName = invoice.customerName || '';
     const customerEmail = invoice.customerEmail || '';
@@ -231,13 +231,13 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       shippingAddress: formatAddress(customerShipping),
     };
 
-    // Map items from backend - backend stores amount, we need to derive unitPrice
+    
     const mappedItems: LineItem[] = Array.isArray(productDetails)
       ? productDetails.map((item: any, index: number) => {
           const quantity = Number(item?.quantity ?? 0);
           const discount = Number(item?.discount ?? 0);
           const amount = Number(item?.amount ?? 0);
-          // Derive unit price from amount: amount = qty * price * (1 - discount/100)
+          
           const discountFactor = 1 - (discount || 0) / 100;
           const price =
             quantity > 0 && discountFactor !== 0
@@ -260,7 +260,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     setMessage(invoice.message || '');
     setSignature(normalizeSignature(invoice.signature));
     
-    // Normalize payment terms to one of the allowed options
+    
     const term = (invoice.paymentTerms || invoice.paymentTerm || '').toString();
     const termMapping: Record<string, string> = {
       'dueonreceipt': 'Due on receipt',
@@ -273,15 +273,15 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     const matchedTerm = termMapping[normalizedTerm] || term || terms;
     setTerms(matchedTerm);
     
-    // Use backend-calculated deposit value (source of truth)
+    
     const totalDeposit = Number(invoice.totalDepositReceived ?? invoice.depositReceived ?? 0);
     setExistingDeposit(totalDeposit);
-    // For edit view, start with 0 additional deposit (user can add more)
-    // For non-edit view, use the total deposit
+    
+    
     setDeposit(isInvoiceEditView ? 0 : totalDeposit);
     setRefNumber(invoice.invoiceReferenceNumber || invoice.invoiceNumber || refNumber);
 
-    // Handle sales rep - backend now returns salesRepId and salesRepName directly
+    
     const salesRepId = invoice.salesRepId || '';
     const salesRepName = invoice.salesRepName || '';
     const isObjectIdLike =
@@ -297,7 +297,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       const rawAmount = Number(item?.amount ?? 0);
       const price = Number(item?.price ?? item?.unitPrice ?? 0);
       const discountFactor = 1 - discount / 100;
-      // Prefer explicit amount; otherwise compute from price and quantity.
+      
       const computedAmount =
         rawAmount > 0
           ? rawAmount
@@ -322,36 +322,36 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     });
   };
 
-  // Helper to normalize signature format - extract base64 from data URL if needed
-  // This ensures signatures are stored as plain base64 strings for API transmission
+  
+  
   const normalizeSignature = (sig: string | undefined): string | undefined => {
     if (!sig) return undefined;
-    // If it's already just base64 (no data URL prefix), return as-is
+    
     if (!sig.startsWith('data:')) return sig;
-    // Otherwise, extract the base64 portion (remove 'data:image/png;base64,' prefix)
+    
     return sig.split(',')[1] || sig;
   };
 
-  // Load existing document if editing
+  
   useEffect(() => {
     if (!isNew && id) {
       if (type === 'estimate') {
         return;
       }
       if (type === 'invoice') {
-        // Prefer invoice passed via navigation state
+        
         if (invoiceState) {
           applyInvoiceToForm(invoiceState);
           return;
         }
-        // Fallback: try local store
+        
         const doc = getDocument(id);
         if (doc) {
           applyInvoiceToForm(doc);
         }
       }
     }
-    // Load from estimate if converting
+    
     if (convertFromId) {
       const doc = getDocument(convertFromId);
       if (doc) {
@@ -423,7 +423,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     fetchEstimate();
   }, [type, id, location.state]);
 
-  // Fetch invoice details when editing an invoice (if not provided via state)
+  
   useEffect(() => {
     const fetchInvoice = async () => {
       if (type !== 'invoice' || !id || id === 'new') {
@@ -444,7 +444,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     fetchInvoice();
   }, [type, id, invoiceState]);
 
-  // Fetch credit note details when viewing a credit note
+  
   useEffect(() => {
     const fetchCreditNote = async () => {
       if (type !== 'credit_note' || !id || id === 'new') {
@@ -454,16 +454,16 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         const response = await api.get(`/api/v1/credit-notes/${id}`);
         const cn = response.data?.creditNote;
         if (cn) {
-          // Set status
+          
           setCreditNoteStatus(cn.status || null);
           
-          // If APPROVED, redirect to view page
+          
           if (cn.status === 'APPROVED') {
             navigate(`/credit-notes/${id}/view`, { replace: true });
             return;
           }
           
-          // Set customer
+          
           if (cn.customerId) {
             const customer = {
               id: cn.customerId,
@@ -476,13 +476,13 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             setSelectedCustomer(customer);
           }
           
-          // Set sales rep
+          
           if (cn.salesRepId) {
             setSalesRep(cn.salesRepId);
             setSelectedSalesRepName(cn.salesRepName || '');
           }
           
-          // Set items/products
+          
           const mappedItems = (cn.products || []).map((p: any, idx: number) => ({
             id: `item-${idx}`,
             productCode: p.productCode || '',
@@ -494,7 +494,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
           }));
           setItems(mappedItems);
           
-          // Set message and signature
+          
           if (cn.message) {
             setMessage(cn.message);
           }
@@ -502,7 +502,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             setSignature(cn.salesRepSignature);
           }
           
-          // Set ref number
+          
           if (cn.creditNoteNumber) {
             setRefNumber(cn.creditNoteNumber);
           }
@@ -516,7 +516,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     fetchCreditNote();
   }, [type, id, navigate]);
 
-  // Fetch refund details when viewing a refund
+  
   useEffect(() => {
     const fetchRefund = async () => {
       if (type !== 'refund' || !id || id === 'new') {
@@ -526,22 +526,22 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         const response = await api.get(`/api/v1/refunds/${id}`);
         const ref = response.data?.refund;
         if (ref) {
-          // Set status
+          
           setRefundStatus(ref.status || null);
           
-          // If REFUNDED, redirect to view page
+          
           if (ref.status === 'REFUNDED') {
             navigate(`/refunds/${id}/view`, { replace: true });
             return;
           }
           
-          // Set source
+          
           setRefundSource(ref.source || 'STANDALONE');
           if (ref.creditNoteId) {
             setSelectedCreditNoteId(ref.creditNoteId);
           }
           
-          // Set customer
+          
           if (ref.customerId) {
             const customer = {
               id: ref.customerId,
@@ -554,13 +554,13 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             setSelectedCustomer(customer);
           }
           
-          // Set sales rep
+          
           if (ref.salesRepId) {
             setSalesRep(ref.salesRepId);
             setSelectedSalesRepName(ref.salesRepName || '');
           }
           
-          // Set items/products
+          
           const mappedItems = (ref.products || []).map((p: any, idx: number) => ({
             id: `item-${idx}`,
             productCode: p.productCode || '',
@@ -572,7 +572,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
           }));
           setItems(mappedItems);
           
-          // Set message and signature
+          
           if (ref.message) {
             setMessage(ref.message);
           }
@@ -580,7 +580,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             setSignature(ref.salesRepSignature);
           }
           
-          // Set ref number
+          
           if (ref.refundNumber) {
             setRefNumber(ref.refundNumber);
           }
@@ -654,7 +654,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         }))
         .filter((rep: any) => rep.name);
       setSalesReps(mapped);
-      // Preserve existing selection if provided (e.g., from invoice/estimate)
+      
       const selectedRep = mapped.find((rep) => rep.id === salesRep);
       const matchByName =
         !selectedRep && selectedSalesRepName
@@ -713,14 +713,14 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     }
   };
 
-  // Helper function to get base product name from description
+  
   const getBaseProductName = (description: string): string => {
-    // If description already has the format "Product Name - quantity X - discount Y%", extract base name
+    
     const match = description.match(/^(.+?)\s*-\s*quantity/i);
     return match ? match[1].trim() : description;
   };
 
-  // Helper function to format description with quantity and discount
+  
   const formatDescription = (baseName: string, quantity: number, discount: number): string => {
     if (discount > 0) {
       return `${baseName} - quantity ${quantity} - discount ${discount}%`;
@@ -735,11 +735,11 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     
     (updated[index] as any)[field] = value;
     
-    // Recalculate amount
+    
     const item = updated[index];
     item.amount = item.quantity * item.unitPrice * (1 - item.discount / 100);
     
-    // Auto-format description when discount or quantity changes
+    
     if (field === 'discount' || field === 'quantity') {
       item.description = formatDescription(baseName, item.quantity, item.discount);
     }
@@ -772,18 +772,18 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     }
   };
 
-  // Calculate subtotal before discounts (for display purposes)
+  
   const subtotalBeforeDiscount = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-  // Calculate total discount amount
+  
   const discountAmount = subtotalBeforeDiscount - items.reduce((sum, item) => sum + item.amount, 0);
   
-  // For invoices, use the shared calculation utility (mirrors backend logic exactly)
-  // This ensures client and server calculations are always consistent
+  
+  
   const effectiveDeposit = isInvoiceEditView ? existingDeposit + deposit : deposit;
   
   const invoiceCalculation: InvoiceCalculationResult = useMemo(() => {
     if (type !== 'invoice') {
-      // For non-invoices, return a simple calculation without tax
+      
       const subtotal = items.reduce((sum, item) => sum + item.amount, 0);
       return {
         subtotal,
@@ -795,7 +795,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         status: 'draft' as const,
       };
     }
-    // Use the shared calculation utility for invoices
+    
     return calculateInvoice({
       items: items.map(item => ({
         productCode: item.productCode,
@@ -809,7 +809,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     });
   }, [items, effectiveDeposit, type]);
   
-  // Extract calculated values
+  
   const subtotal = invoiceCalculation.subtotal;
   const tax = invoiceCalculation.tax;
   const total = invoiceCalculation.total;
@@ -823,7 +823,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     }).format(amount);
   };
 
-  // Prepare receipt data for printing
+  
   const prepareReceiptData = (document: SalesDocument): ReceiptData => {
     return {
       companyName: 'THE XYZ Company Ltd. LTD.',
@@ -874,21 +874,21 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       return;
     }
 
-    // Receipt validation
+    
     if (type === 'receipt') {
       if (!signature?.trim()) {
         toast.error('Signature is required for receipts');
         return;
       }
       
-      // Validate items have productCode
+      
       const invalidItems = items.filter(item => !item.productCode?.trim());
       if (invalidItems.length > 0) {
         toast.error('All items must have a product code');
         return;
       }
 
-      // Validate all items have valid quantities and prices
+      
       const invalidItemData = items.filter(
         item => !item.quantity || item.quantity <= 0 || !item.unitPrice || item.unitPrice < 0
       );
@@ -897,14 +897,14 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         return;
       }
 
-      // For receipts: draft = save draft (print: false), pending = save and print (status: completed, print: true)
+      
       const receiptStatus = status === 'draft' ? 'draft' : 'completed';
       const shouldPrint = status === 'pending';
 
       const receiptPayload = {
         customerId: getCustomerId(selectedCustomer),
         salesRepId: selectedSalesRep.id,
-        saleType: 'cash', // Only cash sales allowed
+        saleType: 'cash', 
         items: items.map((item) => ({
           productCode: item.productCode.trim(),
           description: item.description?.trim() || undefined,
@@ -924,15 +924,15 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         });
         toast.success('Receipt created successfully');
         
-        // If print is true and printer is connected, print the receipt
+        
         if (shouldPrint && isPrinterConnected) {
           try {
-            // Calculate receipt totals for printing
+            
             const receiptSubtotal = items.reduce((sum, item) => sum + item.amount, 0);
             const receiptTax = Number((receiptSubtotal * 0.125).toFixed(2));
             const receiptTotal = Number((receiptSubtotal + receiptTax).toFixed(2));
             
-            // Build receipt document for printing
+            
             const receiptDocument: SalesDocument = {
               id: response.data?.receipt?.id || `DOC-${Date.now()}`,
               type: 'receipt',
@@ -977,21 +977,21 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       }
     }
 
-    // Credit note creation or update
+    
     if (type === 'credit_note') {
       if (!signature?.trim()) {
         toast.error('Signature is required for credit notes');
         return;
       }
       
-      // Validate items have productCode
+      
       const invalidItems = items.filter(item => !item.productCode?.trim());
       if (invalidItems.length > 0) {
         toast.error('All items must have a product code');
         return;
       }
 
-      // Validate all items have valid quantities and prices
+      
       const invalidItemData = items.filter(
         item => !item.quantity || item.quantity <= 0 || !item.unitPrice || item.unitPrice < 0
       );
@@ -1000,8 +1000,8 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         return;
       }
 
-      // For credit notes: draft = saveDraft = true (status: DRAFT), pending = saveDraft = false (status: APPROVED)
-      // Save & Print always sets status to APPROVED (no printer logic)
+      
+      
       const saveDraft = status === 'draft';
 
       const creditNotePayload = {
@@ -1020,14 +1020,14 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
 
       try {
         if (isNew) {
-          // Create new credit note
+          
           const response = await api.post('/api/v1/credit-notes', creditNotePayload, {
             headers: { 'X-Idempotency-Key': idempotencyKey },
           });
           toast.success('Credit note created successfully');
           navigate('/credit-notes');
         } else {
-          // Update existing DRAFT credit note
+          
           if (creditNoteStatus !== 'DRAFT') {
             toast.error('Only draft credit notes can be edited');
             return;
@@ -1047,21 +1047,21 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       }
     }
 
-    // Refund creation or update
+    
     if (type === 'refund') {
       if (!signature?.trim()) {
         toast.error('Signature is required for refunds');
         return;
       }
       
-      // Validate items have productCode
+      
       const invalidItems = items.filter(item => !item.productCode?.trim());
       if (invalidItems.length > 0) {
         toast.error('All items must have a product code');
         return;
       }
 
-      // Validate all items have valid quantities and prices
+      
       const invalidItemData = items.filter(
         item => !item.quantity || item.quantity <= 0 || !item.unitPrice || item.unitPrice < 0
       );
@@ -1070,7 +1070,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         return;
       }
 
-      // Validate creditNoteId if source is FROM_CREDITNOTE
+      
       let creditNoteObjectId: string | undefined = undefined;
       if (refundSource === 'FROM_CREDITNOTE') {
         if (!selectedCreditNoteId) {
@@ -1078,9 +1078,9 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
           return;
         }
         
-        // Try to find credit note by number or ID
+        
         try {
-          // First, try to fetch credit notes to find the one matching the number
+          
           const creditNotesResponse = await api.get('/api/v1/credit-notes', {
             params: { limit: 100 }
           });
@@ -1092,18 +1092,18 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
           if (matchingCreditNote) {
             creditNoteObjectId = matchingCreditNote.id;
           } else {
-            // If not found by number, assume it's already an ObjectId
+            
             creditNoteObjectId = selectedCreditNoteId;
           }
         } catch (error) {
           console.error('Error fetching credit notes:', error);
-          // If fetch fails, assume the input is already an ObjectId
+          
           creditNoteObjectId = selectedCreditNoteId;
         }
       }
 
-      // For refunds: draft = saveDraft = true (status: DRAFT), pending = saveDraft = false (status: REFUNDED)
-      // Save & Print always sets status to REFUNDED (no printer logic)
+      
+      
       const saveDraft = status === 'draft';
 
       const refundPayload = {
@@ -1124,14 +1124,14 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
 
       try {
         if (isNew) {
-          // Create new refund
+          
           const response = await api.post('/api/v1/refunds', refundPayload, {
             headers: { 'X-Idempotency-Key': idempotencyKey },
           });
           toast.success('Refund created successfully');
           navigate('/refunds');
         } else {
-          // Update existing DRAFT refund
+          
           if (refundStatus !== 'DRAFT') {
             toast.error('Only draft refunds can be edited');
             return;
@@ -1183,8 +1183,8 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       deposit: effectiveDeposit,
       status: type === 'invoice' ? computedStatus : status,
       salesRep: selectedSalesRep?.name || '',
-      // Signature is stored as base64 string (without data URL prefix) - ready for API transmission
-      // Backend can reconstruct data URL if needed: `data:image/png;base64,${signature}`
+      
+      
       signature,
       message,
       createdAt: new Date(),
@@ -1192,7 +1192,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       convertedFrom: convertFromId || undefined
     };
 
-    // Invoice creation (new or convert) must hit the API and only succeed on backend success
+    
     if (type === 'invoice' && isNew) {
       const invoicePayload = {
         customerId: getCustomerId(document.customer),
@@ -1239,7 +1239,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         );
         toast.success('Invoice created successfully');
 
-        // If created from estimate, update status after successful invoice creation
+        
         if (invoicePayload.estimateId) {
           try {
             await api.put(`/api/v1/estimate/${invoicePayload.estimateId}`, {
@@ -1250,7 +1250,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
           }
         }
 
-        // Navigate to invoices list and stop further local optimistic handling
+        
         navigate('/invoices');
         return;
       } catch (error) {
@@ -1343,7 +1343,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
     }
 
     if (isNew) {
-      // Skip optimistic add for invoices; they are handled via API above
+      
       if (type !== 'invoice') {
         addDocument(document);
         toast.success(`${title.replace(/s$/, '')} created successfully`);
@@ -1353,10 +1353,10 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       toast.success(`${title.replace(/s$/, '')} updated successfully`);
     }
 
-    // Print receipt if status is 'pending'
+    
     if (status === 'pending') {
       if (isPrinterConnected) {
-        // Print to physical printer if connected
+        
         try {
           const receiptData = prepareReceiptData(document);
           const printSuccess = await printReceipt(receiptData);
@@ -1374,14 +1374,14 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       }
     }
 
-    // Navigate based on document type
-    // Note: credit_note, refund, and receipt are handled above with early returns
+    
+    
     if (type === 'invoice') {
       navigate('/invoices');
     } else if (type === 'estimate') {
       navigate('/estimates');
     } else {
-      // Fallback for any other document types
+      
       navigate(`/${type}s`);
     }
     } finally {
@@ -1429,8 +1429,8 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       return;
     }
 
-    // Client-side deposit validation (mirrors backend logic)
-    // Calculate what the balance would be with new items but existing deposit
+    
+    
     const newItemsCalc = calculateInvoice({
       items: items.map(item => ({
         productCode: item.productCode,
@@ -1443,7 +1443,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
       depositReceived: existingDeposit,
     });
     
-    // Check if the new deposit can be accepted
+    
     const depositCheck = canAcceptDeposit(
       newItemsCalc.balanceDue,
       effectiveDeposit,
@@ -1486,7 +1486,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
   return (
     <MainLayout>
       <div className="space-y-4 sm:space-y-6 animate-fade-in">
-        {/* Header */}
+        {}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3 sm:gap-4">
             <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="shrink-0">
@@ -1502,20 +1502,20 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {/* <Button variant="outline" onClick={handleExport} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
-              <Send className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Export</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={handlePrint}
-              disabled={deviceStatus.rp4 !== 'connected' || isNew}
-              size="sm"
-              className="text-xs sm:text-sm flex-1 sm:flex-none"
-            >
-              <Printer className="h-4 w-4 sm:mr-2" />
-              <span className="hidden sm:inline">Print</span>
-            </Button> */}
+            {
+
+
+
+
+
+
+
+
+
+
+
+
+}
             {!isInvoiceEditView && type !== 'credit_note' && (
               <>
                 <Button variant="outline" onClick={() => handleSave('draft')} disabled={isSubmitting} size="sm" className="text-xs sm:text-sm flex-1 sm:flex-none">
@@ -1565,12 +1565,12 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
         </div>
 
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-4 sm:gap-6">
-          {/* Main Form */}
+          {}
           <fieldset
             disabled={isConvertedFromEstimate || (type === 'credit_note' && creditNoteStatus === 'APPROVED') || (type === 'refund' && refundStatus === 'REFUNDED')}
             className="xl:col-span-2 space-y-4 sm:space-y-6"
           >
-            {/* Customer Selection */}
+            {}
             <div className="glass-card rounded-xl p-4 sm:p-6">
               <h2 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Customer Information</h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
@@ -1716,7 +1716,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                     </SelectContent>
                   </Select>
                 </div>
-                {/* Refund Source Selection */}
+                {}
                 {type === 'refund' && (
                   <div>
                     <Label className="text-xs sm:text-sm">Source</Label>
@@ -1739,7 +1739,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                     </Select>
                   </div>
                 )}
-                {/* Credit Note Selection (only if source is FROM_CREDITNOTE) */}
+                {}
                 {type === 'refund' && refundSource === 'FROM_CREDITNOTE' && (
                   <div>
                     <Label className="text-xs sm:text-sm">Credit Note</Label>
@@ -1774,7 +1774,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
               )}
             </div>
 
-            {/* Line Items */}
+            {}
             <div className="glass-card rounded-xl p-4 sm:p-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 sm:mb-4 gap-2">
                 <h2 className="font-display font-semibold text-sm sm:text-base">Product Details</h2>
@@ -1798,7 +1798,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                 </div>
               </div>
 
-              {/* Desktop Table */}
+              {}
               <div className="hidden md:block overflow-x-auto">
                 <Table>
                   <TableHeader>
@@ -1895,7 +1895,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
                 </Table>
               </div>
 
-              {/* Mobile Cards */}
+              {}
               <div className="md:hidden space-y-3">
                 {items.length === 0 ? (
                   <div className="text-center py-6 text-muted-foreground text-sm">
@@ -1975,7 +1975,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
               </div>
             </div>
 
-            {/* Message & Signature */}
+            {}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6">
               <div className="glass-card rounded-xl p-4 sm:p-6">
                 <h2 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Message</h2>
@@ -2001,9 +2001,9 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
             </div>
           </fieldset>
 
-          {/* Summary Sidebar */}
+          {}
           <div className="space-y-4 sm:space-y-6">
-            {/* Terms */}
+            {}
             {type === 'invoice' && (
               <div className="glass-card rounded-xl p-4 sm:p-6">
                 <h2 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Payment Terms</h2>
@@ -2022,7 +2022,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
               </div>
             )}
 
-            {/* Deposit */}
+            {}
             {( type === 'invoice') && (
               <div className="glass-card rounded-xl p-4 sm:p-6">
                 <h2 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Deposit Received</h2>
@@ -2062,7 +2062,7 @@ export default function DocumentFormPage({ type, title }: DocumentFormPageProps)
               </div>
             )}
 
-            {/* Summary */}
+            {}
             <div className="glass-card rounded-xl p-4 sm:p-6 ">
               <h2 className="font-display font-semibold mb-3 sm:mb-4 text-sm sm:text-base">Summary</h2>
               <div className="space-y-2 sm:space-y-3 text-xs sm:text-sm">

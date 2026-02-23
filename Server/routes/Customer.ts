@@ -4,7 +4,7 @@ import { authenticate } from "../middleware/auth";
 
 const customerRouter = express.Router();
 
-// All routes require authentication
+
 customerRouter.use(authenticate);
 
 customerRouter.post("/", createCustomer);

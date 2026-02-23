@@ -19,12 +19,12 @@ export function Header() {
   const handleScan = async () => {
     const barcode = await triggerScan();
     console.log('Scanned barcode:', barcode);
-    // Could navigate to product or invoice lookup
+    
   };
 
   return (
     <header className="sticky top-0 z-30 h-14 xl:h-16 bg-background/80 backdrop-blur-md border-b border-border px-4 xl:px-6 flex items-center justify-between">
-      {/* Search */}
+      {}
       <div className="relative w-64 xl:w-96">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
         <Input
@@ -36,9 +36,9 @@ export function Header() {
         />
       </div>
 
-      {/* Actions */}
+      {}
       <div className="flex items-center gap-3">
-        {/* Scan Button */}
+        {}
         <Button
           variant="outline"
           size="sm"
@@ -50,7 +50,7 @@ export function Header() {
           Scan
         </Button>
 
-        {/* New Document Dropdown */}
+        {}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button size="sm" className="gap-2">

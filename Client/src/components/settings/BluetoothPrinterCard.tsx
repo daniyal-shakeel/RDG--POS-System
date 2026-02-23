@@ -47,7 +47,7 @@ export function BluetoothPrinterCard() {
       </div>
       
       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
-        {/* Status Indicator */}
+        {}
         <div className={`flex items-center gap-2 text-sm ${
           isConnected ? 'text-success' : 'text-destructive'
         }`}>
@@ -64,7 +64,7 @@ export function BluetoothPrinterCard() {
           )}
         </div>
         
-        {/* Action Buttons */}
+        {}
         {isConnected ? (
           <Button 
             variant="outline" 

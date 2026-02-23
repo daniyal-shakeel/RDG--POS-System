@@ -13,10 +13,10 @@ import {
   validateString,
 } from "../utils/validation";
 
-const TAX_RATE = 0.125; // 12.5% VAT
+const TAX_RATE = 0.125; 
 
 type IncomingReceiptItem = {
-  productId?: string; // Optional - if not provided, will be looked up by productCode
+  productId?: string; 
   productCode?: string;
   description?: string;
   quantity?: number;
@@ -24,9 +24,9 @@ type IncomingReceiptItem = {
   discount?: number;
 };
 
-/**
- * Generate unique receipt number in format RCP-XXXX-XXXX
- */
+
+
+
 const generateReceiptNumber = async (): Promise<string> => {
   let attempts = 0;
   while (attempts < 5) {
@@ -41,31 +41,31 @@ const generateReceiptNumber = async (): Promise<string> => {
   throw new Error("Unable to generate unique receipt number");
 };
 
-/**
- * Calculate receipt totals
- */
+
+
+
 const calculateReceiptTotals = (items: Array<{
   quantity: number;
   price: number;
   discount: number;
   amount: number;
 }>) => {
-  // Subtotal before discount: sum of (quantity * price)
+  
   const subtotalBeforeDiscount = items.reduce(
     (sum, item) => sum + (item.quantity * item.price),
     0
   );
 
-  // Subtotal after discount: sum of item amounts (after applying discounts)
+  
   const subtotalAfterDiscount = items.reduce(
     (sum, item) => sum + item.amount,
     0
   );
 
-  // Tax: 12.5% of subtotal after discount
+  
   const tax = Number((subtotalAfterDiscount * TAX_RATE).toFixed(2));
 
-  // Total: subtotal after discount + tax
+  
   const total = Number((subtotalAfterDiscount + tax).toFixed(2));
 
   return {
@@ -76,9 +76,9 @@ const calculateReceiptTotals = (items: Array<{
   };
 };
 
-/**
- * Validate and normalize receipt item
- */
+
+
+
 const normalizeAndValidateItem = async (
   item: IncomingReceiptItem,
   index: number
@@ -93,7 +93,7 @@ const normalizeAndValidateItem = async (
 }> => {
   const errors: string[] = [];
 
-  // Validate productCode (required)
+  
   const productCodeValidation = validateString(item.productCode, {
     required: true,
     fieldName: "productCode",
@@ -102,23 +102,23 @@ const normalizeAndValidateItem = async (
     errors.push(`productCode: ${productCodeValidation.error}`);
   }
 
-  // Generate a dummy productId for now (product validation removed temporarily)
-  // If productId is provided, use it; otherwise generate a new ObjectId
+  
+  
   let productId: Types.ObjectId;
   if (item.productId) {
     const productIdValidation = validateObjectId(item.productId, true);
     if (productIdValidation.isValid && productIdValidation.value) {
       productId = new Types.ObjectId(productIdValidation.value);
     } else {
-      // If invalid, generate a new ObjectId
+      
       productId = new Types.ObjectId();
     }
   } else {
-    // Generate a new ObjectId for the product
+    
     productId = new Types.ObjectId();
   }
 
-  // Validate description (optional)
+  
   const descriptionValidation = validateString(item.description, {
     required: false,
     maxLength: 500,
@@ -127,19 +127,19 @@ const normalizeAndValidateItem = async (
     errors.push(`description: ${descriptionValidation.error}`);
   }
 
-  // Validate quantity
+  
   const quantity = Number(item.quantity ?? 0);
   if (!Number.isFinite(quantity) || quantity <= 0) {
     errors.push("quantity must be > 0");
   }
 
-  // Validate price
+  
   const price = Number(item.price ?? 0);
   if (!Number.isFinite(price) || price < 0) {
     errors.push("price must be >= 0");
   }
 
-  // Validate discount
+  
   const discount = Number(item.discount ?? 0);
   if (!Number.isFinite(discount) || discount < 0 || discount > 100) {
     errors.push("discount must be between 0 and 100");
@@ -149,7 +149,7 @@ const normalizeAndValidateItem = async (
     throw new Error(`Item ${index + 1}: ${errors.join(", ")}`);
   }
 
-  // Calculate amount: quantity * price * (1 - discount/100)
+  
   const amount = Number((quantity * price * (1 - discount / 100)).toFixed(2));
 
   return {
@@ -163,10 +163,10 @@ const normalizeAndValidateItem = async (
   };
 };
 
-/**
- * Create a new receipt (cash sale only)
- * POST /api/v1/receipt
- */
+
+
+
+
 export const createReceipt = async (
   req: AuthRequest,
   res: Response
@@ -188,7 +188,7 @@ export const createReceipt = async (
       print,
     } = req.body || {};
 
-    // Validate saleType - only cash sales allowed
+    
     if (saleType !== "cash") {
       res.status(400).json({
         message: "Only cash sales are allowed. Use invoice endpoint for invoice payments.",
@@ -196,7 +196,7 @@ export const createReceipt = async (
       return;
     }
 
-    // Validate customerId
+    
     const customerIdValidation = validateObjectId(customerId, true);
     if (!customerIdValidation.isValid) {
       res.status(400).json({ message: `customerId: ${customerIdValidation.error}` });
@@ -210,7 +210,7 @@ export const createReceipt = async (
       return;
     }
 
-    // Validate salesRepId
+    
     const salesRepIdValidation = validateObjectId(salesRepId, true);
     if (!salesRepIdValidation.isValid) {
       res.status(400).json({ message: `salesRepId: ${salesRepIdValidation.error}` });
@@ -224,7 +224,7 @@ export const createReceipt = async (
       return;
     }
 
-    // Verify sales rep role
+    
     const salesRepRole = await Role.findOne({ name: "Sales Representative" }).lean();
     if (!salesRepRole) {
       res.status(500).json({ message: "Sales representative role not configured" });
@@ -240,13 +240,13 @@ export const createReceipt = async (
       return;
     }
 
-    // Validate items
+    
     if (!Array.isArray(items) || items.length === 0) {
       res.status(400).json({ message: "At least one item is required" });
       return;
     }
 
-    // Normalize and validate all items
+    
     const normalizedItems: Array<{
       productId: Types.ObjectId;
       productCode: string;
@@ -268,7 +268,7 @@ export const createReceipt = async (
       }
     }
 
-    // Validate signature
+    
     const signatureValidation = validateString(signature, {
       required: true,
       fieldName: "signature",
@@ -278,7 +278,7 @@ export const createReceipt = async (
       return;
     }
 
-    // Validate message (optional)
+    
     const messageValidation = validateString(message, {
       required: false,
       maxLength: 1000,
@@ -288,15 +288,15 @@ export const createReceipt = async (
       return;
     }
 
-    // Validate status
+    
     const validStatuses = ["draft", "completed"];
     const receiptStatus = status && validStatuses.includes(status) ? status : "draft";
     
-    // Validate print flag
+    
     const shouldPrint = typeof print === "boolean" ? print : false;
 
-    // If status is completed, print should be true (save and print)
-    // If status is draft, print should be false (save draft)
+    
+    
     if (receiptStatus === "completed" && !shouldPrint) {
       res.status(400).json({
         message: "Print must be true when status is completed (save and print)",
@@ -310,13 +310,13 @@ export const createReceipt = async (
       return;
     }
 
-    // Calculate totals
+    
     const totals = calculateReceiptTotals(normalizedItems);
 
-    // Generate receipt number
+    
     const receiptNumber = await generateReceiptNumber();
 
-    // Create receipt
+    
     const receipt = await Receipt.create({
       receiptNumber,
       customerId: customerObjectId,
@@ -360,10 +360,10 @@ export const createReceipt = async (
   }
 };
 
-/**
- * Get all receipts
- * GET /api/v1/receipt
- */
+
+
+
+
 export const getReceipts = async (
   req: AuthRequest,
   res: Response
@@ -386,7 +386,7 @@ export const getReceipts = async (
       .skip(offset)
       .lean();
 
-    // Map receipts to include only required fields
+    
     const mappedReceipts = receipts.map((receipt: any) => {
       const customer = receipt.customerId || {};
       const salesRep = receipt.salesRepId || {};
@@ -429,10 +429,10 @@ export const getReceipts = async (
   }
 };
 
-/**
- * Get receipt by ID
- * GET /api/v1/receipt/:id
- */
+
+
+
+
 export const getReceiptById = async (
   req: AuthRequest,
   res: Response
@@ -463,13 +463,13 @@ export const getReceiptById = async (
       return;
     }
 
-    // Format the response with only necessary data
+    
     const customer = receipt.customerId as any;
     const salesRep = receipt.salesRepId as any;
     const invoice = receipt.invoiceId as any;
     const invoiceEdit = receipt.invoiceEditId as any;
 
-    // Map items to only include fields needed by client
+    
     const items = receipt.items.map((item: any) => ({
       productId: item.productId?.toString() || item.productId,
       productCode: item.productCode,
@@ -536,10 +536,10 @@ export const getReceiptById = async (
   }
 };
 
-/**
- * Generate receipt from invoice edit
- * POST /api/v1/receipt/generate-from-invoice
- */
+
+
+
+
 export const generateReceiptFromInvoice = async (
   req: AuthRequest,
   res: Response
@@ -552,7 +552,7 @@ export const generateReceiptFromInvoice = async (
 
     const { invoiceId, editId, signature } = req.body || {};
 
-    // Validate invoiceId
+    
     const invoiceIdValidation = validateObjectId(invoiceId, true);
     if (!invoiceIdValidation.isValid) {
       res.status(400).json({ message: `invoiceId: ${invoiceIdValidation.error}` });
@@ -570,7 +570,7 @@ export const generateReceiptFromInvoice = async (
       return;
     }
 
-    // editId is required - receipt must be generated from a specific invoice edit
+    
     if (!editId) {
       res.status(400).json({ message: "editId is required. Receipt must be generated from a specific invoice edit." });
       return;
@@ -590,23 +590,23 @@ export const generateReceiptFromInvoice = async (
       return;
     }
 
-    // Verify edit belongs to this invoice
+    
     if (invoiceEdit.baseInvoiceId?.toString() !== invoiceObjectId.toString()) {
       res.status(400).json({ message: "Invoice edit does not belong to this invoice" });
       return;
     }
 
-    // Validation: Receipt can only be generated if depositAdded > 0
-    // Use depositAdded (deposit from this specific edit) not depositReceived (total from base invoice)
+    
+    
     const depositAdded = Number(invoiceEdit.depositAdded ?? 0);
     if (depositAdded <= 0) {
       res.status(400).json({ message: "Receipt cannot be generated with zero deposit." });
       return;
     }
 
-    // Idempotency check: Check if a receipt already exists for this invoice edit
-    // Uniqueness is based on (invoiceId + invoiceEditId) combination
-    // The same invoice can have multiple receipts if it has multiple edits
+    
+    
+    
     const existingReceipt = await Receipt.findOne({ 
       invoiceId: invoiceObjectId,
       invoiceEditId: invoiceEditObjectId
@@ -626,14 +626,14 @@ export const generateReceiptFromInvoice = async (
       return;
     }
 
-    // Use items from invoice edit (required)
+    
     const sourceItems = invoiceEdit.items || [];
     if (!Array.isArray(sourceItems) || sourceItems.length === 0) {
       res.status(400).json({ message: "Invoice edit has no items to generate receipt from" });
       return;
     }
 
-    // Validate customer from invoice edit
+    
     const customerId = invoiceEdit.customerId as any;
     if (!customerId) {
       res.status(400).json({ message: "Invoice edit has no customer" });
@@ -649,7 +649,7 @@ export const generateReceiptFromInvoice = async (
       return;
     }
 
-    // Validate sales rep from invoice edit
+    
     const salesRepId = invoiceEdit.salesRep as any;
     if (!salesRepId) {
       res.status(400).json({ message: "Invoice edit has no sales representative" });
@@ -665,7 +665,7 @@ export const generateReceiptFromInvoice = async (
       return;
     }
 
-    // Verify sales rep role
+    
     const salesRepRole = await Role.findOne({ name: "Sales Representative" }).lean();
     if (!salesRepRole) {
       res.status(500).json({ message: "Sales representative role not configured" });
@@ -681,7 +681,7 @@ export const generateReceiptFromInvoice = async (
       return;
     }
 
-    // Validate signature (use invoice edit signature if not provided, but signature is required)
+    
     let receiptSignature: string;
     if (signature) {
       const signatureValidation = validateString(signature, {
@@ -702,9 +702,9 @@ export const generateReceiptFromInvoice = async (
       return;
     }
 
-    // Convert invoice/edit items to receipt items
-    // Invoice items have: productCode, description, quantity, discount, amount
-    // Receipt items need: productId, productCode, description, quantity, price, discount, amount
+    
+    
+    
     const receiptItems: Array<{
       productId: Types.ObjectId;
       productCode: string;
@@ -740,15 +740,15 @@ export const generateReceiptFromInvoice = async (
         return;
       }
 
-      // Calculate price from amount, quantity, and discount
-      // amount = quantity * price * (1 - discount/100)
-      // price = amount / (quantity * (1 - discount/100))
+      
+      
+      
       const discountFactor = 1 - discount / 100;
       const price = discountFactor > 0 && quantity > 0
         ? Number((amount / (quantity * discountFactor)).toFixed(2))
         : 0;
 
-      // Generate dummy productId (product validation removed)
+      
       const productId = new Types.ObjectId();
 
       receiptItems.push({
@@ -762,12 +762,12 @@ export const generateReceiptFromInvoice = async (
       });
     }
 
-    // Use totals from invoice edit (reflects the exact state at time of edit)
-    // Calculate receipt totals from items for validation, but use invoice edit totals
+    
+    
     const calculatedTotals = calculateReceiptTotals(receiptItems);
     
-    // Use invoice edit totals (these reflect the actual invoice state at time of edit)
-    // The receipt should match the invoice edit's financial state exactly
+    
+    
     const receiptTotals = {
       subtotalBeforeDiscount: invoiceEdit.total || calculatedTotals.subtotalBeforeDiscount,
       subtotalAfterDiscount: invoiceEdit.total || calculatedTotals.subtotalAfterDiscount,
@@ -775,14 +775,14 @@ export const generateReceiptFromInvoice = async (
       total: invoiceEdit.total || calculatedTotals.total,
     };
 
-    // Generate receipt number
+    
     const receiptNumber = await generateReceiptNumber();
 
-    // Get deposit amount from current invoice edit only (depositAdded, not total depositReceived)
-    // depositAdded is the deposit for this specific edit, not the cumulative total
+    
+    
     const depositAmount = Number(invoiceEdit.depositAdded ?? 0);
 
-    // Build message including deposit information if applicable
+    
     let receiptMessage = invoiceEdit.message || invoice.message || undefined;
     if (depositAmount > 0) {
       const depositInfo = `Deposit received: ${depositAmount.toFixed(2)}`;
@@ -791,9 +791,9 @@ export const generateReceiptFromInvoice = async (
         : depositInfo;
     }
 
-    // Create receipt with saleType: 'invoice', linked to invoice and invoice edit
-    // Note: Idempotency is already checked above, but we catch database constraint violations
-    // as a safety net for race conditions
+    
+    
+    
     let receipt;
     try {
       receipt = await Receipt.create({
@@ -802,19 +802,19 @@ export const generateReceiptFromInvoice = async (
         salesRepId: salesRepObjectId,
         saleType: "invoice",
         invoiceId: invoiceObjectId,
-        invoiceEditId: invoiceEditObjectId, // Store reference to the invoice edit used
+        invoiceEditId: invoiceEditObjectId, 
         items: receiptItems,
         message: receiptMessage,
         signature: receiptSignature,
-        status: "completed", // Receipts from invoices are always completed
-        print: true, // Receipts from invoices should be printed
-        deposit: depositAmount, // Store deposit amount from invoice edit
+        status: "completed", 
+        print: true, 
+        deposit: depositAmount, 
         ...receiptTotals,
       });
     } catch (createError: any) {
-      // Handle database unique constraint violation (backup check)
+      
       if (createError.code === 11000 || createError.name === 'MongoServerError') {
-        // Duplicate key error - check if it's our compound index
+        
         const existingReceipt = await Receipt.findOne({
           invoiceId: invoiceObjectId,
           invoiceEditId: invoiceEditObjectId
@@ -834,7 +834,7 @@ export const generateReceiptFromInvoice = async (
           return;
         }
       }
-      // Re-throw if it's not a duplicate key error
+      
       throw createError;
     }
 

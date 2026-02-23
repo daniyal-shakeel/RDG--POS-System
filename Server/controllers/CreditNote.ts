@@ -17,9 +17,9 @@ type IncomingProduct = {
   price?: number;
 };
 
-/**
- * Generate unique credit note number in format CN-XXXX-XXXX
- */
+
+
+
 const generateCreditNoteNumber = async (): Promise<string> => {
   let attempts = 0;
   while (attempts < 5) {
@@ -34,9 +34,9 @@ const generateCreditNoteNumber = async (): Promise<string> => {
   throw new Error("Unable to generate unique credit note number");
 };
 
-/**
- * Validate and normalize credit note product
- */
+
+
+
 const normalizeAndValidateProduct = (
   product: IncomingProduct,
   index: number
@@ -48,7 +48,7 @@ const normalizeAndValidateProduct = (
 } => {
   const errors: string[] = [];
 
-  // Validate productCode (required)
+  
   const productCodeValidation = validateString(product.productCode, {
     required: true,
     fieldName: "productCode",
@@ -57,13 +57,13 @@ const normalizeAndValidateProduct = (
     errors.push(`Product ${index + 1}: ${productCodeValidation.error}`);
   }
 
-  // Validate quantity (required, must be > 0)
+  
   const quantity = Number(product.quantity ?? 0);
   if (!Number.isFinite(quantity) || quantity <= 0) {
     errors.push(`Product ${index + 1}: quantity must be a positive number`);
   }
 
-  // Validate price (required, must be >= 0)
+  
   const price = Number(product.price ?? 0);
   if (!Number.isFinite(price) || price < 0) {
     errors.push(`Product ${index + 1}: price must be a non-negative number`);
@@ -81,9 +81,9 @@ const normalizeAndValidateProduct = (
   };
 };
 
-/**
- * Create a new credit note
- */
+
+
+
 export const createCreditNote = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user) {
@@ -99,7 +99,7 @@ export const createCreditNote = async (req: AuthRequest, res: Response) => {
       saveDraft = false,
     } = req.body || {};
 
-    // Validate customerId
+    
     if (!customerId || !Types.ObjectId.isValid(customerId)) {
       return res.status(400).json({ message: "Valid customerId is required" });
     }
@@ -109,7 +109,7 @@ export const createCreditNote = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "Customer not found" });
     }
 
-    // Validate salesRepId
+    
     if (!salesRepId || !Types.ObjectId.isValid(salesRepId)) {
       return res.status(400).json({ message: "Valid salesRepId is required" });
     }
@@ -119,7 +119,7 @@ export const createCreditNote = async (req: AuthRequest, res: Response) => {
       return res.status(404).json({ message: "Sales representative not found" });
     }
 
-    // Verify sales rep has Sales Representative role
+    
     const salesRepRole = await Role.findOne({ name: "Sales Representative" }).lean();
     if (!salesRepRole) {
       return res.status(500).json({ message: "Sales representative role not configured" });
@@ -134,12 +134,12 @@ export const createCreditNote = async (req: AuthRequest, res: Response) => {
       return res.status(403).json({ message: "User is not a Sales Representative" });
     }
 
-    // Validate products
+    
     if (!Array.isArray(products) || products.length === 0) {
       return res.status(400).json({ message: "At least one product is required" });
     }
 
-    // Normalize and validate all products
+    
     const normalizedProducts = [];
     for (let idx = 0; idx < products.length; idx++) {
       const product = products[idx] as IncomingProduct;
@@ -153,21 +153,21 @@ export const createCreditNote = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Validate signature
+    
     if (!salesRepSignature || typeof salesRepSignature !== "string" || salesRepSignature.trim().length === 0) {
       return res.status(400).json({ message: "salesRepSignature is required" });
     }
 
-    // Generate credit note number
+    
     const creditNoteNumber = await generateCreditNoteNumber();
 
-    // Determine status based on saveDraft flag
+    
     const status = saveDraft === true ? "DRAFT" : "APPROVED";
 
-    // Create credit note
+    
     const creditNote = await CreditNote.create({
       creditNoteNumber,
-      source: "STANDALONE", // For now, only standalone credit notes
+      source: "STANDALONE", 
       customerId: new Types.ObjectId(customerId),
       salesRepId: new Types.ObjectId(salesRepId),
       products: normalizedProducts,
@@ -185,7 +185,7 @@ export const createCreditNote = async (req: AuthRequest, res: Response) => {
   } catch (error: any) {
     console.error("Create credit note error:", error);
     
-    // Handle duplicate key error (creditNoteNumber uniqueness)
+    
     if (error.code === 11000 || error.name === "MongoServerError") {
       return res.status(409).json({
         message: "Credit note number already exists. Please try again.",
@@ -199,16 +199,16 @@ export const createCreditNote = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Get all credit notes with pagination
- */
+
+
+
 export const getCreditNotes = async (req: AuthRequest, res: Response) => {
   try {
     const limit = Math.min(Number(req.query.limit) || 50, 200);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
     const statusFilter = req.query.status as string | undefined;
 
-    // Build query
+    
     const query: any = {};
     if (statusFilter && statusFilter !== "all") {
       query.status = statusFilter.toUpperCase();
@@ -225,7 +225,7 @@ export const getCreditNotes = async (req: AuthRequest, res: Response) => {
       CreditNote.countDocuments(query),
     ]);
 
-    // Map credit notes to response format
+    
     const mapped = creditNotes.map((cn: any) => {
       const customer = cn.customerId || {};
       const salesRep = cn.salesRepId || {};
@@ -265,9 +265,9 @@ export const getCreditNotes = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Get credit note by ID
- */
+
+
+
 export const getCreditNoteById = async (req: AuthRequest, res: Response) => {
   try {
     const { id } = req.params;
@@ -320,9 +320,9 @@ export const getCreditNoteById = async (req: AuthRequest, res: Response) => {
   }
 };
 
-/**
- * Update a credit note (only allowed for DRAFT status)
- */
+
+
+
 export const updateCreditNote = async (req: AuthRequest, res: Response) => {
   try {
     if (!req.user) {
@@ -334,20 +334,20 @@ export const updateCreditNote = async (req: AuthRequest, res: Response) => {
       return res.status(400).json({ message: "Invalid credit note id" });
     }
 
-    // Find the credit note first to check its status
+    
     const existingCreditNote = await CreditNote.findById(new Types.ObjectId(id)).lean();
     if (!existingCreditNote) {
       return res.status(404).json({ message: "Credit note not found" });
     }
 
-    // Prevent editing APPROVED credit notes
+    
     if (existingCreditNote.status === "APPROVED") {
       return res.status(403).json({
         message: "Approved credit notes cannot be edited",
       });
     }
 
-    // Only DRAFT credit notes can be edited
+    
     if (existingCreditNote.status !== "DRAFT") {
       return res.status(400).json({
         message: `Credit notes with status ${existingCreditNote.status} cannot be edited`,
@@ -363,7 +363,7 @@ export const updateCreditNote = async (req: AuthRequest, res: Response) => {
       saveDraft = false,
     } = req.body || {};
 
-    // Validate customerId if provided
+    
     if (customerId) {
       if (!Types.ObjectId.isValid(customerId)) {
         return res.status(400).json({ message: "Valid customerId is required" });
@@ -374,7 +374,7 @@ export const updateCreditNote = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Validate salesRepId if provided
+    
     if (salesRepId) {
       if (!Types.ObjectId.isValid(salesRepId)) {
         return res.status(400).json({ message: "Valid salesRepId is required" });
@@ -384,7 +384,7 @@ export const updateCreditNote = async (req: AuthRequest, res: Response) => {
         return res.status(404).json({ message: "Sales representative not found" });
       }
 
-      // Verify sales rep has Sales Representative role
+      
       const salesRepRole = await Role.findOne({ name: "Sales Representative" }).lean();
       if (!salesRepRole) {
         return res.status(500).json({ message: "Sales representative role not configured" });
@@ -400,7 +400,7 @@ export const updateCreditNote = async (req: AuthRequest, res: Response) => {
       }
     }
 
-    // Build update object
+    
     const updateData: any = {};
 
     if (products !== undefined) {
@@ -408,7 +408,7 @@ export const updateCreditNote = async (req: AuthRequest, res: Response) => {
         return res.status(400).json({ message: "At least one product is required" });
       }
 
-      // Normalize and validate all products
+      
       const normalizedProducts = [];
       for (let idx = 0; idx < products.length; idx++) {
         const product = products[idx] as IncomingProduct;
@@ -443,14 +443,14 @@ export const updateCreditNote = async (req: AuthRequest, res: Response) => {
       updateData.salesRepSignature = (salesRepSignature || "").trim();
     }
 
-    // Determine status based on saveDraft flag
+    
     if (saveDraft === true) {
       updateData.status = "DRAFT";
     } else if (saveDraft === false) {
       updateData.status = "APPROVED";
     }
 
-    // Update the credit note
+    
     const updatedCreditNote = await CreditNote.findByIdAndUpdate(
       new Types.ObjectId(id),
       { $set: updateData },

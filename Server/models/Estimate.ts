@@ -1,10 +1,10 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * IEstimateItem represents a line on an estimate.  It is similar to
- * invoice items but stored separately to allow different defaults and
- * status values.
- */
+
+
+
+
+
 export interface IEstimateItem {
   productCode: string;
   description: string;
@@ -13,12 +13,12 @@ export interface IEstimateItem {
   amount: number;
 }
 
-/**
- * Estimate represents a quote provided to a customer before converting to
- * an invoice.  Estimates may be accepted, converted to an invoice or
- * expire after a set date.  A depositReceived field allows capturing
- * advance payments.
- */
+
+
+
+
+
+
 export interface IEstimate extends Document {
   reference: string;
   customerId: Types.ObjectId;

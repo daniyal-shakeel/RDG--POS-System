@@ -11,9 +11,9 @@ export interface AuthRequest extends Request {
   };
 }
 
-/**
- * Middleware to authenticate JWT tokens
- */
+
+
+
 export const authenticate = (
   req: AuthRequest,
   res: Response,
@@ -36,7 +36,7 @@ export const authenticate = (
 
     const decoded = jwt.verify(token, JWT_SECRET) as any;
     req.user = {
-      userId: decoded.userId || decoded.email, // Support both formats
+      userId: decoded.userId || decoded.email, 
       email: decoded.email,
       role: decoded.role,
       permissions: decoded.permissions || [],
@@ -57,9 +57,9 @@ export const authenticate = (
   }
 };
 
-/**
- * Middleware to authorize based on roles
- */
+
+
+
 export const authorize = (...allowedRoles: string[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {

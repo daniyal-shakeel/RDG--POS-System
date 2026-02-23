@@ -1,8 +1,8 @@
 import { Schema, model, Document, Types } from "mongoose";
 
-/**
- * Line items stored on an invoice.
- */
+
+
+
 export interface IInvoiceItem {
   productCode: string;
   description: string;
@@ -11,14 +11,14 @@ export interface IInvoiceItem {
   amount: number;
 }
 
-/**
- * Invoice model captures issued invoices, payments, and status state.
- * - If converted from an estimate, the same signature should be reused.
- * - Status rules (handled in business logic):
- *   - depositReceived === total -> paid
- *   - 0 < depositReceived < total -> partial (balance/due updated)
- *   - depositReceived === 0 -> pending (default stays draft until issued)
- */
+
+
+
+
+
+
+
+
 export interface IInvoice extends Document {
   invoiceNumber: string;
   editIds?: Types.ObjectId[];
@@ -26,7 +26,7 @@ export interface IInvoice extends Document {
   depositReceivedTotal?: number;
   customerId: Types.ObjectId;
   salesRep?: Types.ObjectId;
-  paymentId?: Types.ObjectId; // Reference to the payment record (all invoices with same payment share same paymentId)
+  paymentId?: Types.ObjectId; 
   items: IInvoiceItem[];
   message?: string;
   signature?: string;

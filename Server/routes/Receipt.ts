@@ -10,7 +10,7 @@ import { requirePermission } from "../middleware/permissions";
 
 const receiptRouter = express.Router();
 
-// All routes require authentication
+
 receiptRouter.use(authenticate);
 
 receiptRouter.post("/", requirePermission("receipt.create"), createReceipt);

@@ -13,7 +13,7 @@ import { requirePermission } from "../middleware/permissions";
 
 const estimateRouter = express.Router();
 
-// All routes require authentication
+
 estimateRouter.use(authenticate);
 
 estimateRouter.post("/save", requirePermission("estimate.create"), createEstimate);

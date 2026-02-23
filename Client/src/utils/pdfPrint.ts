@@ -1,9 +1,9 @@
 import { SalesDocument } from '@/types/pos';
 import { format } from 'date-fns';
 
-/**
- * Generates and opens a PDF of the receipt using browser's print dialog
- */
+
+
+
 export function printReceiptAsPDF(document: SalesDocument): void {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-TT', {
@@ -12,14 +12,14 @@ export function printReceiptAsPDF(document: SalesDocument): void {
     }).format(amount);
   };
 
-  // Create a new window for printing
+  
   const printWindow = window.open('', '_blank');
   if (!printWindow) {
     console.error('Failed to open print window. Please allow popups.');
     return;
   }
 
-  // Build HTML content
+  
   const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -228,20 +228,20 @@ export function printReceiptAsPDF(document: SalesDocument): void {
 </html>
   `;
 
-  // Write content to the new window
+  
   printWindow.document.write(htmlContent);
   printWindow.document.close();
 
-  // Wait for content to load, then trigger print
+  
   printWindow.onload = () => {
     setTimeout(() => {
       printWindow.print();
-      // Close window after printing (optional - user might want to keep it open)
-      // printWindow.close();
+      
+      
     }, 250);
   };
 
-  // Fallback if onload doesn't fire
+  
   setTimeout(() => {
     if (printWindow.document.readyState === 'complete') {
       printWindow.print();

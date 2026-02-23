@@ -44,7 +44,7 @@ export default function Dashboard() {
   return (
     <MainLayout>
       <div className="space-y-4 xl:space-y-6 animate-fade-in">
-        {/* Page Header */}
+        {}
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-xl xl:text-2xl font-display font-bold">Dashboard</h1>

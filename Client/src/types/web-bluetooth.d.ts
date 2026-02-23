@@ -1,5 +1,5 @@
-// Web Bluetooth API Types
-// These types are needed because Web Bluetooth is not yet standardized in TypeScript
+
+
 
 interface BluetoothDevice {
   id: string;

@@ -42,7 +42,7 @@ import {
   FormMessage,
 } from '@/components/ui/form';
 
-// User form validation schema
+
 const userSchema = z.object({
   fullName: z.string()
     .min(1, 'Full name is required')
@@ -54,7 +54,7 @@ const userSchema = z.object({
     .max(255, 'Email must be less than 255 characters')
     .refine((val) => val.trim().length > 0, 'Email cannot be empty or whitespace only')
     .refine((val) => {
-      // Validate email format after trimming and lowercasing
+      
       const trimmedEmail = val.trim().toLowerCase();
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       return emailRegex.test(trimmedEmail);
@@ -92,7 +92,7 @@ export default function UsersPage() {
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Check if current user can manage users (has user.manage permission or is Super Admin)
+  
   const { hasPermission } = usePermissions();
   const canManageUsers = hasPermission('user.manage');
   const isSuperAdmin = user?.permissions?.includes('*') || false;
@@ -164,7 +164,7 @@ export default function UsersPage() {
       toast.success(response.data.message || 'User created successfully');
       setIsCreateDialogOpen(false);
       form.reset();
-      fetchUsers(); // Refresh the list
+      fetchUsers(); 
       if (data.role === 'Sales Representative') {
         await refreshSalesReps();
       }
@@ -181,7 +181,7 @@ export default function UsersPage() {
     try {
       const response = await api.patch(`/api/v1/user/${userId}/suspend`);
       toast.success(response.data.message || 'User suspended successfully');
-      fetchUsers(); // Refresh the list
+      fetchUsers(); 
     } catch (error: any) {
       console.error('Error suspending user:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to suspend user';
@@ -193,7 +193,7 @@ export default function UsersPage() {
     try {
       const response = await api.patch(`/api/v1/user/${userId}/unsuspend`);
       toast.success(response.data.message || 'User unsuspended successfully');
-      fetchUsers(); // Refresh the list
+      fetchUsers(); 
     } catch (error: any) {
       console.error('Error unsuspending user:', error);
       const errorMessage = error.response?.data?.message || error.message || 'Failed to unsuspend user';
@@ -217,7 +217,7 @@ export default function UsersPage() {
   return (
     <MainLayout>
       <div className="space-y-4 sm:space-y-6 animate-fade-in">
-        {/* Header */}
+        {}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
             <h1 className="text-xl sm:text-2xl font-display font-bold">Users</h1>
@@ -236,7 +236,7 @@ export default function UsersPage() {
           )}
         </div>
 
-        {/* Search */}
+        {}
         <div className="relative w-full sm:max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
@@ -247,14 +247,14 @@ export default function UsersPage() {
           />
         </div>
 
-        {/* Loading State */}
+        {}
         {isLoading && (
           <div className="glass-card rounded-xl p-8 text-center">
             <p className="text-muted-foreground">Loading users...</p>
           </div>
         )}
 
-        {/* Table - Desktop */}
+        {}
         {!isLoading && (
           <div className="glass-card rounded-xl overflow-hidden hidden lg:block">
             <Table>
@@ -350,7 +350,7 @@ export default function UsersPage() {
           </div>
         )}
 
-        {/* Mobile/Tablet Cards */}
+        {}
         {!isLoading && (
           <div className="lg:hidden space-y-3">
             {filteredUsers.length === 0 ? (
@@ -431,7 +431,7 @@ export default function UsersPage() {
           </div>
         )}
 
-        {/* Create User Dialog */}
+        {}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
           <DialogContent className="sm:max-w-[500px]">
             <DialogHeader>

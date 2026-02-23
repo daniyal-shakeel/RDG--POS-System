@@ -1,10 +1,10 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * ProductVariant represents a specific variation of a product (e.g. size or
- * color).  Each variant has its own SKU and pricing.  Variants belong to
- * a product.
- */
+
+
+
+
+
 export interface IProductVariant extends Document {
   product: Types.ObjectId;
   name: string;

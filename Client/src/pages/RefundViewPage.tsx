@@ -69,7 +69,7 @@ const formatCurrency = (amount: number) =>
     currency: 'TTD',
   }).format(amount);
 
-// Helper function to format address (handles both string and object formats)
+
 const formatAddress = (address?: any): string => {
   if (!address) return 'N/A';
   if (typeof address === 'string') return address;
@@ -85,16 +85,16 @@ const formatAddress = (address?: any): string => {
   return parts.length > 0 ? parts.join(', ') : 'N/A';
 };
 
-// Helper function to format signature for display
+
 const formatSignatureSrc = (signature: string | undefined | null): string | undefined => {
   if (!signature) return undefined;
   
-  // If it already has a data URL prefix, return as is
+  
   if (signature.startsWith('data:')) {
     return signature;
   }
   
-  // Otherwise, add the data URL prefix for base64 image
+  
   return `data:image/png;base64,${signature}`;
 };
 
@@ -154,7 +154,7 @@ const RefundViewPage: React.FC = () => {
     );
   }
 
-  // Calculate totals
+  
   const subtotal = refund.products.reduce(
     (sum, product) => sum + (product.quantity * product.price),
     0
@@ -163,7 +163,7 @@ const RefundViewPage: React.FC = () => {
   return (
     <MainLayout>
       <div className="space-y-4 md:space-y-6">
-        {/* Header */}
+        {}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
             <Button 
@@ -190,7 +190,7 @@ const RefundViewPage: React.FC = () => {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          {/* Refund Information */}
+          {}
           <Card>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -257,7 +257,7 @@ const RefundViewPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Customer Information */}
+          {}
           <Card>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -330,9 +330,9 @@ const RefundViewPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* Sales Representative and Items Grid */}
+        {}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          {/* Sales Representative */}
+          {}
           <Card>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -350,7 +350,7 @@ const RefundViewPage: React.FC = () => {
             </CardContent>
           </Card>
 
-          {/* Items Table */}
+          {}
           <Card>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg">Products</CardTitle>
@@ -386,7 +386,7 @@ const RefundViewPage: React.FC = () => {
           </Card>
         </div>
 
-        {/* Totals */}
+        {}
         <Card>
           <CardHeader className="pb-3 md:pb-4">
             <CardTitle className="text-base md:text-lg">Totals</CardTitle>
@@ -407,9 +407,9 @@ const RefundViewPage: React.FC = () => {
           </CardContent>
         </Card>
 
-        {/* Signature and Metadata Grid */}
+        {}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          {/* Signature */}
+          {}
           {refund.salesRepSignature && (
             <Card>
               <CardHeader className="pb-3 md:pb-4">
@@ -433,7 +433,7 @@ const RefundViewPage: React.FC = () => {
             </Card>
           )}
 
-          {/* Metadata */}
+          {}
           <Card>
             <CardHeader className="pb-3 md:pb-4">
               <CardTitle className="text-base md:text-lg">Metadata</CardTitle>

@@ -1,8 +1,8 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * ICreditNoteProduct models a product on a credit note
- */
+
+
+
 export interface ICreditNoteProduct {
   productCode: string;
   description?: string;
@@ -10,12 +10,12 @@ export interface ICreditNoteProduct {
   price: number;
 }
 
-/**
- * CreditNote represents a credit issued to a customer
- * Can be created standalone or from an invoice (future feature)
- */
+
+
+
+
 export interface ICreditNote extends Document {
-  creditNoteNumber: string; // Unique reference (format: CN-XXXX-XXXX)
+  creditNoteNumber: string; 
   source: 'FROM_INVOICE' | 'STANDALONE';
   customerId: Types.ObjectId;
   salesRepId: Types.ObjectId;
@@ -31,8 +31,8 @@ const CreditNoteProductSchema = new Schema<ICreditNoteProduct>(
   {
     productCode: { type: String, required: true, trim: true },
     description: { type: String, trim: true },
-    quantity: { type: Number, required: true, min: 0.01 }, // Must be > 0
-    price: { type: Number, required: true, min: 0 }, // Must be >= 0
+    quantity: { type: Number, required: true, min: 0.01 }, 
+    price: { type: Number, required: true, min: 0 }, 
   },
   { _id: false }
 );

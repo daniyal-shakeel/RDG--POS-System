@@ -15,7 +15,7 @@ export function ReceiptPrintView({ document }: ReceiptPrintViewProps) {
 
   return (
     <div className="receipt-print print-only bg-background text-foreground font-mono text-xs">
-      {/* Header */}
+      {}
       <div className="text-center mb-4">
         <p className="font-bold text-sm">THE XYZ Company Ltd. LTD.</p>
         <p>22 Macoya Road West</p>
@@ -27,7 +27,7 @@ export function ReceiptPrintView({ document }: ReceiptPrintViewProps) {
 
       <div className="border-t border-dashed border-foreground my-2" />
 
-      {/* Document Info */}
+      {}
       <div className="mb-2">
         <div className="flex justify-between">
           <span>{document.type.toUpperCase().replace('_', ' ')}</span>
@@ -51,7 +51,7 @@ export function ReceiptPrintView({ document }: ReceiptPrintViewProps) {
 
       <div className="border-t border-dashed border-foreground my-2" />
 
-      {/* Customer */}
+      {}
       <div className="mb-2">
         <p className="font-bold">BILL TO:</p>
         <p>{document.customer.name}</p>
@@ -60,7 +60,7 @@ export function ReceiptPrintView({ document }: ReceiptPrintViewProps) {
 
       <div className="border-t border-dashed border-foreground my-2" />
 
-      {/* Items */}
+      {}
       <div className="mb-2">
         {document.items.map((item, index) => (
           <div key={item.id} className="mb-1">
@@ -78,7 +78,7 @@ export function ReceiptPrintView({ document }: ReceiptPrintViewProps) {
 
       <div className="border-t border-dashed border-foreground my-2" />
 
-      {/* Totals */}
+      {}
       <div className="mb-2">
         <div className="flex justify-between">
           <span>Subtotal:</span>
@@ -114,7 +114,7 @@ export function ReceiptPrintView({ document }: ReceiptPrintViewProps) {
 
       <div className="border-t border-dashed border-foreground my-2" />
 
-      {/* Signature */}
+      {}
       {document.signature && (
         <div className="mb-2">
           <p className="text-center text-[10px]">RECEIVED</p>
@@ -123,12 +123,12 @@ export function ReceiptPrintView({ document }: ReceiptPrintViewProps) {
         </div>
       )}
 
-      {/* Message */}
+      {}
       {document.message && (
         <p className="text-center text-[10px] italic my-2">{document.message}</p>
       )}
 
-      {/* Footer */}
+      {}
       <div className="text-center mt-4">
         <p className="font-bold">Thank you for your business!</p>
         <p className="text-[10px] mt-1">

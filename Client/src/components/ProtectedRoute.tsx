@@ -4,7 +4,7 @@ import { api } from '@/services/api';
 import { UserRole } from '@/types/pos';
 import { hasPermission } from '@/utils/permissions';
 
-// Persists across route changes so we don't show loading when switching tabs/routes
+
 let hasCompletedInitialAuth = false;
 const AUTH_USER_CACHE_KEY = 'auth_user_cache';
 
@@ -41,7 +41,7 @@ export default function ProtectedRoute({
   requiredRole,
   requiredPermission,
 }: ProtectedRouteProps) {
-  // When switching routes: use cached auth to avoid loading flash; check-auth runs in background
+  
   const token = typeof window !== 'undefined' ? localStorage.getItem('token') : null;
   const cachedUser = hasCompletedInitialAuth && token ? getCachedAuthUser() : null;
   const [isLoading, setIsLoading] = useState(!!token && !cachedUser);
@@ -52,22 +52,22 @@ export default function ProtectedRoute({
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        // Only show loading on very first app load - run check-auth silently when switching tabs/routes
+        
         if (!hasCompletedInitialAuth) {
           setIsLoading(true);
         }
 
-        // Check if token exists in localStorage
+        
         const token = localStorage.getItem('token');
         if (!token) {
           setIsAuthenticated(false);
           setIsLoading(false);
-          hasCompletedInitialAuth = false; // Reset so next login shows loading on first check
+          hasCompletedInitialAuth = false; 
           sessionStorage.removeItem(AUTH_USER_CACHE_KEY);
           return;
         }
 
-        // Call check-auth endpoint (runs behind the scenes on tab/route changes)
+        
         const response = await api.get<AuthResponse>('/check-auth');
         
         if (response.data.authenticated && response.data.user) {
@@ -95,7 +95,7 @@ export default function ProtectedRoute({
     checkAuth();
   }, [location.pathname]);
 
-  // Show loading only on very first load - never when switching tabs/routes
+  
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
@@ -107,12 +107,12 @@ export default function ProtectedRoute({
     );
   }
 
-  // Redirect to login if not authenticated
+  
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // Check role authorization if required
+  
   if (requiredRole && user) {
     const userRole = mapBackendRoleToFrontendRole(user.role);
     const allowedRoles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
@@ -165,11 +165,11 @@ export default function ProtectedRoute({
     }
   }
 
-  // User is authenticated and authorized
+  
   return <>{children}</>;
 }
 
-// Helper function to map backend role to frontend UserRole
+
 function mapBackendRoleToFrontendRole(backendRole: string): UserRole {
   const roleMap: Record<string, UserRole> = {
     'Super Admin': 'super_admin',
@@ -180,7 +180,7 @@ function mapBackendRoleToFrontendRole(backendRole: string): UserRole {
     'Stock Keeper': 'stock_keeper',
   };
   
-  // Normalize role name (remove underscores, handle variations)
+  
   const normalizedRole = backendRole.replace(/_/g, ' ');
   return roleMap[normalizedRole] || roleMap[backendRole] || 'sales_rep';
 }

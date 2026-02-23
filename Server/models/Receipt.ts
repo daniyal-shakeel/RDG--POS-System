@@ -1,49 +1,49 @@
 import { Schema, model, Document, Types } from 'mongoose';
 
-/**
- * Receipt item line - represents a product sold on a receipt
- */
+
+
+
 export interface IReceiptItem {
   productId: Types.ObjectId;
   productCode: string;
   description?: string;
   quantity: number;
   price: number;
-  discount?: number; // Discount percentage (0-100)
-  amount: number; // Calculated: quantity * price * (1 - discount/100)
+  discount?: number; 
+  amount: number; 
 }
 
-/**
- * Receipt model - records completed sales transactions
- * 
- * Calculations (done at backend):
- * - Amount before discount and tax: sum of (quantity * price) for all items
- * - Amount after discount: sum of item amounts (after applying discounts)
- * - Tax: 12.5% of amount after discount
- * - Total: amount after discount + tax
- * 
- * Status:
- * - draft: Receipt is being created/edited
- * - completed: Receipt is finalized and completed
- */
+
+
+
+
+
+
+
+
+
+
+
+
+
 export interface IReceipt extends Document {
-  receiptNumber: string; // Generated at backend (format: RCP-XXXX-XXXX)
+  receiptNumber: string; 
   customerId: Types.ObjectId;
   salesRepId: Types.ObjectId;
-  saleType: 'cash' | 'invoice'; // Type of sale: cash sale or invoice payment
-  invoiceId?: Types.ObjectId; // Reference to invoice if saleType is 'invoice'
-  invoiceEditId?: Types.ObjectId; // Reference to invoice edit used to generate this receipt
+  saleType: 'cash' | 'invoice'; 
+  invoiceId?: Types.ObjectId; 
+  invoiceEditId?: Types.ObjectId; 
   items: IReceiptItem[];
   message?: string;
   signature: string;
   status: 'draft' | 'completed';
-  print: boolean; // Whether receipt should be printed (true for save and print, false for save draft)
-  deposit?: number; // Deposit amount received (for invoice-based receipts)
-  // Calculated fields (computed at backend)
-  subtotalBeforeDiscount: number; // Sum of quantity * price (before discounts)
-  subtotalAfterDiscount: number; // Sum of item amounts (after discounts)
-  tax: number; // 12.5% of subtotalAfterDiscount
-  total: number; // subtotalAfterDiscount + tax
+  print: boolean; 
+  deposit?: number; 
+  
+  subtotalBeforeDiscount: number; 
+  subtotalAfterDiscount: number; 
+  tax: number; 
+  total: number; 
   createdAt: Date;
   updatedAt: Date;
 }
@@ -100,14 +100,14 @@ const ReceiptSchema = new Schema<IReceipt>(
   { timestamps: true }
 );
 
-// Compound unique index: One receipt per invoice edit
-// This ensures that each invoice edit can only generate one receipt
-// The same invoice can have multiple receipts if it has multiple edits
+
+
+
 ReceiptSchema.index(
   { invoiceId: 1, invoiceEditId: 1 },
   { 
     unique: true, 
-    sparse: true, // Only apply to documents where both fields exist
+    sparse: true, 
     name: 'invoice_edit_unique'
   }
 );

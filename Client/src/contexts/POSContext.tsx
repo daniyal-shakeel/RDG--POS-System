@@ -22,13 +22,13 @@ interface POSContextType {
 
 const POSContext = createContext<POSContextType | undefined>(undefined);
 
-// Constants for localStorage keys
+
 const TOKEN_KEY = 'token';
 const USER_KEY = 'user';
 const CUSTOMER_NAMES_KEY = 'customerNames';
 const SALES_REPS_KEY = 'salesReps';
 
-// Helper function to map backend role to frontend UserRole
+
 const mapRoleToUserRole = (role: string): UserRole => {
   const roleMap: Record<string, UserRole> = {
     'Super Admin': 'super_admin',
@@ -39,24 +39,24 @@ const mapRoleToUserRole = (role: string): UserRole => {
     'Stock Keeper': 'stock_keeper',
   };
   
-  // Normalize role name (remove underscores, handle variations)
+  
   const normalizedRole = role.replace(/_/g, ' ');
   return roleMap[normalizedRole] || roleMap[role] || 'sales_rep';
 };
 
 export function POSProvider({ children }: { children: ReactNode }) {
-  // Initialize user from localStorage
+  
   const [user, setUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem(USER_KEY);
     if (savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
-        // Only Super Admin should have "*" permission
-        // Check by originalRole (backend role name) or if permissions already include "*"
+        
+        
         if (parsedUser.originalRole === 'Super Admin' || parsedUser.permissions?.includes('*')) {
           parsedUser.permissions = ['*'];
         }
-        // Otherwise, use the permissions from backend (don't override)
+        
         return parsedUser;
       } catch {
         return null;
@@ -85,12 +85,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
         throw new Error('No token received from server');
       }
 
-      // Store token
+      
       localStorage.setItem(TOKEN_KEY, token);
 
-      // Map backend user data to frontend User type
+      
       const mappedRole = mapRoleToUserRole(userData.role || 'sales_rep');
-      // Only Super Admin gets "*" permission - check by exact role name from backend
+      
       const isSuperAdmin = userData.role === 'Super Admin';
       const mappedUser: User = {
         id: userData.id || userData._id || '',
@@ -98,16 +98,16 @@ export function POSProvider({ children }: { children: ReactNode }) {
         email: userData.email || '',
         role: mappedRole,
         avatar: userData.avatar,
-        originalRole: userData.role, // Store original backend role for display
-        // Only Super Admin gets "*" permission, others use permissions from backend
+        originalRole: userData.role, 
+        
         permissions: isSuperAdmin ? ['*'] : (userData.permissions || []),
       };
 
-      // Store user data
+      
       localStorage.setItem(USER_KEY, JSON.stringify(mappedUser));
       setUser(mappedUser);
 
-      // Fetch customers and sales reps for allowed roles
+      
       const allowedRoles = ['Super Admin', 'Admin', 'Sales Representative'];
       if (allowedRoles.includes(userData.role)) {
         try {
@@ -153,12 +153,12 @@ export function POSProvider({ children }: { children: ReactNode }) {
     } catch (error: any) {
       console.error('Login error:', error);
       
-      // Provide more informative error message for network errors
+      
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
         error.message = 'Cannot connect to server. Please make sure the backend server is running.';
       }
       
-      // Clear any partial data
+      
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem(CUSTOMER_NAMES_KEY);
@@ -170,20 +170,20 @@ export function POSProvider({ children }: { children: ReactNode }) {
 
   const logout = async (): Promise<void> => {
     try {
-      // Call logout API endpoint (token will be added automatically via interceptor)
-      // Even if API call fails, we still want to clear local state
+      
+      
       try {
         await api.post('/api/v1/auth/logout');
       } catch (error: any) {
-        // Log error but don't throw - we still want to clear local state
-        // This handles cases where token is already invalid or expired
+        
+        
         console.warn('Logout API call failed:', error.response?.data?.message || error.message);
       }
     } catch (error: any) {
-      // Handle unexpected errors
+      
       console.error('Logout error:', error);
     } finally {
-      // Always clear local storage and user state
+      
       localStorage.removeItem(TOKEN_KEY);
       localStorage.removeItem(USER_KEY);
       localStorage.removeItem(CUSTOMER_NAMES_KEY);
@@ -220,7 +220,7 @@ export function POSProvider({ children }: { children: ReactNode }) {
     setDeviceStatusState(prev => ({ ...prev, ct60: 'scanning' }));
     await new Promise(resolve => setTimeout(resolve, 1500));
     setDeviceStatusState(prev => ({ ...prev, ct60: 'connected' }));
-    // Return mock barcode
+    
     const codes = ['RDG-001', 'RDG-002', 'RDG-003', 'RDG-004', 'RDG-005'];
     return codes[Math.floor(Math.random() * codes.length)];
   };

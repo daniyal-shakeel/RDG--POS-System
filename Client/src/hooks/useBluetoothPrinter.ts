@@ -14,10 +14,10 @@ export function useBluetoothPrinter(): UseBluetoothPrinter {
   const isSupported = bluetoothPrinter.isSupported();
 
   useEffect(() => {
-    // Check initial status
+    
     setIsConnected(bluetoothPrinter.getConnectionStatus());
 
-    // Subscribe to connection changes
+    
     const unsubscribe = bluetoothPrinter.onConnectionChange(setIsConnected);
 
     return () => {

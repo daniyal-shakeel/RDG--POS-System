@@ -21,13 +21,13 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      // Use context login function which handles API call, token storage, and user data
+      
       await login(email.trim(), password);
       
       toast.success('Login successful');
       navigate('/');
     } catch (error: any) {
-      // Handle API errors
+      
       let errorMessage = 'An error occurred. Please try again.';
       
       if (error.code === 'ERR_NETWORK' || error.message === 'Network Error') {
@@ -47,14 +47,14 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      {/* Background decoration */}
+      {}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-accent/10 rounded-full blur-3xl" />
       </div>
 
       <div className="w-full max-w-md animate-fade-in relative z-10">
-        {/* Logo */}
+        {}
         <div className="text-center mb-8">
           <h1 className="font-display text-3xl font-bold text-gradient mb-2">
             XYZ Company Ltd.
@@ -62,7 +62,7 @@ export default function LoginPage() {
           <p className="text-muted-foreground">Point of Sale System</p>
         </div>
 
-        {/* Login Card */}
+        {}
         <div className="glass-card rounded-2xl p-8 shadow-lg">
           <div className="text-center mb-6">
             <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 mb-4">
@@ -135,7 +135,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Footer */}
+        {}
         <p className="text-center text-xs text-muted-foreground mt-6">
           © 2025 The XYZ Company Ltd. Ltd. All rights reserved.
         </p>

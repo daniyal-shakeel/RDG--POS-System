@@ -12,7 +12,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { ArrowLeft, Save, User, Mail, Phone, MapPin } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/services/api';
-import axios from 'axios';
 
 const addressSchema = z.object({
   street: z.string().min(1, 'Street is required').max(255),
@@ -91,7 +90,7 @@ const CustomerNewPage: React.FC = () => {
     },
   });
 
-  // Fetch customer data when in edit mode
+  
   useEffect(() => {
     const fetchCustomer = async () => {
       if (!isEditMode || !id) return;
@@ -101,7 +100,7 @@ const CustomerNewPage: React.FC = () => {
         const response = await api.get(`/api/v1/customer/${id}`);
         const backendCustomer: BackendCustomer = response.data.customer;
         
-        // Pre-fill form with customer data
+        
         const normalizedValues: CustomerFormData = {
           name: backendCustomer.name || '',
           email: backendCustomer.email || '',
@@ -125,7 +124,7 @@ const CustomerNewPage: React.FC = () => {
         form.reset(normalizedValues);
         initialValuesRef.current = normalizedValues;
 
-        // Check if shipping address is the same as billing
+        
         const billing = backendCustomer.billingAddress;
         const shipping = backendCustomer.shippingAddress;
         if (billing && shipping) {
@@ -153,25 +152,25 @@ const CustomerNewPage: React.FC = () => {
     fetchCustomer();
   }, [id, isEditMode, form, navigate]);
 
-  // Watch billing address to copy to shipping when checkbox is checked
+  
   const billingAddress = form.watch('billingAddress');
 
   useEffect(() => {
     if (useSameAddress && billingAddress) {
       form.setValue('shippingAddress', { ...billingAddress });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    
   }, [useSameAddress, billingAddress]);
 
   const handleSameAddressChange = (checked: boolean | 'indeterminate') => {
     const isChecked = checked === true;
     setUseSameAddress(isChecked);
     if (isChecked) {
-      // Copy billing address to shipping
+      
       const currentBilling = form.getValues('billingAddress');
       form.setValue('shippingAddress', { ...currentBilling });
     } else {
-      // Clear shipping address
+      
       form.setValue('shippingAddress', {
         street: '',
         city: '',
@@ -204,15 +203,11 @@ const CustomerNewPage: React.FC = () => {
       }
     };
     try {
-      // Get token from localStorage and add to Authorization header
-      const token = localStorage.getItem('token') || '';
-      const trimmedToken = token.trim();
-
       if (isEditMode && id) {
         const originalValues = initialValuesRef.current ?? data;
         const changes: Record<string, any> = {};
 
-        // Top-level fields
+        
         ['name', 'email', 'phone'].forEach((field) => {
           const typedField = field as keyof CustomerFormData;
           if (data[typedField] !== (originalValues as any)[typedField]) {
@@ -220,7 +215,7 @@ const CustomerNewPage: React.FC = () => {
           }
         });
 
-        // Billing address diff
+        
         const billingChanges: Record<string, string> = {};
         ['street', 'city', 'state', 'postalCode', 'country'].forEach((key) => {
           const newVal = data.billingAddress?.[key as keyof IAddress] || '';
@@ -237,7 +232,7 @@ const CustomerNewPage: React.FC = () => {
         const initialShippingSame = initialUseSameAddressRef.current;
 
         if (currentShippingSame) {
-          // If user switched to using same address, flag it
+          
           if (currentShippingSame !== initialShippingSame) {
             changes.shippingSameAsBilling = true;
           }
@@ -269,14 +264,9 @@ const CustomerNewPage: React.FC = () => {
           return;
         }
 
-        await axios.put(`http://localhost:5500/api/v1/customer/${id}`, changes, {
-          headers: {
-            'Authorization': `Bearer ${trimmedToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        await api.put(`/api/v1/customer/${id}`, changes);
       } else {
-        // Prepare data for backend (create)
+        
         const customerData: {
           name: string;
           email: string;
@@ -303,12 +293,7 @@ const CustomerNewPage: React.FC = () => {
           }
         }
 
-        await axios.post('http://localhost:5500/api/v1/customer', customerData, {
-          headers: {
-            'Authorization': `Bearer ${trimmedToken}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        await api.post('/api/v1/customer', customerData);
         await refreshCustomerNames();
       }
 
@@ -341,7 +326,7 @@ const CustomerNewPage: React.FC = () => {
   return (
     <MainLayout>
       <div className="space-y-4 md:space-y-6">
-        {/* Header */}
+        {}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
           <Button 
             variant="ghost" 
@@ -365,7 +350,7 @@ const CustomerNewPage: React.FC = () => {
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 md:space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-              {/* Basic Information */}
+              {}
               <Card>
                 <CardHeader className="pb-3 md:pb-4">
                   <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -424,7 +409,7 @@ const CustomerNewPage: React.FC = () => {
                 </CardContent>
               </Card>
 
-              {/* Billing Address */}
+              {}
               <Card>
                 <CardHeader className="pb-3 md:pb-4">
                   <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -510,7 +495,7 @@ const CustomerNewPage: React.FC = () => {
               </Card>
             </div>
 
-            {/* Shipping Address */}
+            {}
             <Card>
               <CardHeader className="pb-3 md:pb-4">
                 <CardTitle className="text-base md:text-lg flex items-center gap-2">
@@ -621,7 +606,7 @@ const CustomerNewPage: React.FC = () => {
               </CardContent>
             </Card>
 
-            {/* Actions */}
+            {}
             <div className="flex flex-col sm:flex-row gap-3 sm:justify-end">
               <Button 
                 type="button" 
